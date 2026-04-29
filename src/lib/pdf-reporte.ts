@@ -328,6 +328,16 @@ function htmlReporte(d: DatosReportePDF): string {
 // ─── Puppeteer ────────────────────────────────────────────────
 
 async function abrirBrowser() {
+  // Render / cualquier server con ruta explícita configurada
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    return puppeteer.launch({
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+    })
+  }
+
+  // Vercel / AWS Lambda → usa @sparticuz/chromium
   if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
     const chromium = (await import('@sparticuz/chromium')).default
     return puppeteer.launch({
@@ -338,6 +348,7 @@ async function abrirBrowser() {
     })
   }
 
+  // Desarrollo local
   const executablePath =
     process.platform === 'win32'
       ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
