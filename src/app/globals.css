@@ -15,3 +15,76 @@ html, body {
   color: #374151;
   margin-bottom: 0.25rem;
 }
+
+/* ── CSS Variables ─────────────────────────────────────── */
+:root {
+  --bg:           #f3f4f6;
+  --surface:      #ffffff;
+  --surface-2:    #f9fafb;
+  --border:       #e5e7eb;
+  --text:         #111827;
+  --text-muted:   #6b7280;
+  --primary:      #1a7a6e;
+  --primary-hover:#155f56;
+  --danger:       #dc2626;
+  --input-bg:     #ffffff;
+}
+
+body.dark-mode {
+  --bg:           #111827;
+  --surface:      #1f2937;
+  --surface-2:    #374151;
+  --border:       #4b5563;
+  --text:         #f9fafb;
+  --text-muted:   #9ca3af;
+  --primary:      #34d399;
+  --primary-hover:#10b981;
+  --danger:       #f87171;
+  --input-bg:     #374151;
+}
+
+/* ── Dark mode global overrides ────────────────────────── */
+body.dark-mode {
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+body.dark-mode .bg-white { background-color: var(--surface) !important; }
+body.dark-mode .bg-gray-50 { background-color: var(--surface) !important; }
+body.dark-mode .bg-gray-100 { background-color: var(--surface-2) !important; }
+body.dark-mode .bg-gray-200 { background-color: var(--surface-2) !important; }
+
+body.dark-mode .border-gray-100,
+body.dark-mode .border-gray-200,
+body.dark-mode .border-gray-300 { border-color: var(--border) !important; }
+body.dark-mode .divide-gray-100 > * + * { border-color: var(--border) !important; }
+
+body.dark-mode .text-gray-900 { color: var(--text) !important; }
+body.dark-mode .text-gray-800 { color: var(--text) !important; }
+body.dark-mode .text-gray-700 { color: var(--text) !important; }
+body.dark-mode .text-gray-600 { color: var(--text-muted) !important; }
+body.dark-mode .text-gray-500 { color: var(--text-muted) !important; }
+body.dark-mode .text-gray-400 { color: var(--text-muted) !important; }
+
+body.dark-mode input:not([type="checkbox"]):not([type="radio"]),
+body.dark-mode textarea,
+body.dark-mode select {
+  background-color: var(--input-bg) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+body.dark-mode tbody tr:nth-child(even) td { background-color: var(--surface-2) !important; }
+body.dark-mode tbody tr:hover td { background-color: var(--surface-2) !important; }
+body.dark-mode tbody tr:hover { background-color: var(--surface-2) !important; }
+
+body.dark-mode .shadow-lg { box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important; }
+body.dark-mode .shadow-xl { box-shadow: 0 20px 40px rgba(0,0,0,0.6) !important; }
+
+body.dark-mode .hover\:bg-gray-50:hover { background-color: var(--surface-2) !important; }
+body.dark-mode .hover\:bg-gray-100:hover { background-color: var(--surface-2) !important; }
+
+/* ── Mobile touch scrolling ─────────────────────────────── */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}

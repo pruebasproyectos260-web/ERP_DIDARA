@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
   const { searchParams } = new URL(req.url)
   const estado = searchParams.get('estado') ?? ''
   const clienteId = searchParams.get('cliente_id') ?? ''
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
   const body = await req.json()
   const { items, ...reporteData } = body
 

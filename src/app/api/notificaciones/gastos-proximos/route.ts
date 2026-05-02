@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET() {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
   const { data: gastos } = await supabase.from('gastos_fijos').select('*').not('dia', 'is', null)
 
   if (!gastos?.length) return NextResponse.json({ data: [] })

@@ -47,7 +47,7 @@ export default function GastosClient({ gastosFijosInit, gastosVariablesInit, niv
   const [err, setErr] = useState('')
 
   const [fFijo, setFFijo] = useState({ nombre: '', monto: '', dia: '', fecha_inicio: '', notas: '' })
-  const [fVar,  setFVar]  = useState({ fecha: new Date().toISOString().slice(0, 10), tipo: 'Combustible', tipoOtro: '', monto: '', descripcion: '' })
+  const [fVar,  setFVar]  = useState({ fecha: new Date().toISOString().slice(0, 10), tipo: 'Combustible', tipoOtro: '', monto: '', descripcion: '', metodo_pago: '' })
 
   // ── Filtrado variables ─────────────────────────────────────────────────────
   const varFiltradas = useMemo(() => {
@@ -110,19 +110,19 @@ export default function GastosClient({ gastosFijosInit, gastosVariablesInit, niv
 
   // ── Handlers gastos variables ─────────────────────────────────────────────
   function abrirNuevoVar() {
-    setEditVar(null); setFVar({ fecha: new Date().toISOString().slice(0, 10), tipo: 'Combustible', tipoOtro: '', monto: '', descripcion: '' })
+    setEditVar(null); setFVar({ fecha: new Date().toISOString().slice(0, 10), tipo: 'Combustible', tipoOtro: '', monto: '', descripcion: '', metodo_pago: '' })
     setModalVar(true); setErr('')
   }
   function abrirEditarVar(g: GastoVariable) {
     const esOtro = !TIPOS_VAR.includes(g.tipo) || g.tipo === 'Otro'
-    setEditVar(g); setFVar({ fecha: g.fecha, tipo: esOtro ? 'Otro' : g.tipo, tipoOtro: esOtro ? g.tipo : '', monto: String(g.monto), descripcion: g.descripcion ?? '' })
+    setEditVar(g); setFVar({ fecha: g.fecha, tipo: esOtro ? 'Otro' : g.tipo, tipoOtro: esOtro ? g.tipo : '', monto: String(g.monto), descripcion: g.descripcion ?? '', metodo_pago: g.metodo_pago ?? '' })
     setModalVar(true); setErr('')
   }
 
   async function guardarVar(e: React.FormEvent) {
     e.preventDefault(); setErr('')
     const tipoFinal = fVar.tipo === 'Otro' ? (fVar.tipoOtro || 'Otro') : fVar.tipo
-    const payload = { fecha: fVar.fecha, tipo: tipoFinal, monto: parseFloat(fVar.monto), descripcion: fVar.descripcion || null, registrado_por: usuarioNombre || null }
+    const payload = { fecha: fVar.fecha, tipo: tipoFinal, monto: parseFloat(fVar.monto), descripcion: fVar.descripcion || null, metodo_pago: fVar.metodo_pago || null, registrado_por: usuarioNombre || null }
     const url = editVar ? `/api/gastos-variables/${editVar.id}` : '/api/gastos-variables'
     const res = await fetch(url, { method: editVar ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     const json = await res.json()
@@ -161,8 +161,8 @@ export default function GastosClient({ gastosFijosInit, gastosVariablesInit, niv
         </div>
       </div>
 
-      {/* ── GASTOS FIJOS ──────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* ── GASTOS FIJOS (solo admin) ────────────────────────────────────────── */}
+      {nivel <= 1 && <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors cursor-pointer"
           onClick={() => setOpenFijos((v) => !v)}>
           <div className="flex items-center gap-3">
@@ -214,7 +214,7 @@ export default function GastosClient({ gastosFijosInit, gastosVariablesInit, niv
             )}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* ── GASTOS VARIABLES ─────────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -272,6 +272,7 @@ export default function GastosClient({ gastosFijosInit, gastosVariablesInit, niv
                             <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Tipo</th>
                             <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Descripción</th>
                             <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">Monto</th>
+                            <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 hidden sm:table-cell">Método de pago</th>
                             <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 hidden md:table-cell">Registrado por</th>
                             <th className="px-4 py-2"></th>
                           </tr>
@@ -287,6 +288,7 @@ export default function GastosClient({ gastosFijosInit, gastosVariablesInit, niv
                               </td>
                               <td className="px-4 py-2.5 text-gray-700">{g.descripcion ?? '—'}</td>
                               <td className="px-4 py-2.5 text-right font-bold text-red-700">{fmt(g.monto)}</td>
+                              <td className="px-4 py-2.5 text-gray-600 text-xs hidden sm:table-cell">{g.metodo_pago ?? '—'}</td>
                               <td className="px-4 py-2.5 text-gray-400 text-xs hidden md:table-cell">{g.registrado_por ?? '—'}</td>
                               <td className="px-4 py-2.5">
                                 <div className="flex items-center gap-1">
@@ -367,7 +369,17 @@ export default function GastosClient({ gastosFijosInit, gastosVariablesInit, niv
                 <label className="label">Monto ($) *</label>
                 <input type="number" required min="0" step="0.01" value={fVar.monto} onChange={(e) => setFVar((f) => ({ ...f, monto: e.target.value }))} className={inputCls} />
               </div>
-              <div className={fVar.tipo === 'Otro' ? '' : 'col-span-2'}>
+              <div>
+                <label className="label">Método de pago</label>
+                <select value={fVar.metodo_pago} onChange={(e) => setFVar((f) => ({ ...f, metodo_pago: e.target.value }))} className={inputCls}>
+                  <option value="">Sin especificar</option>
+                  <option value="Efectivo">Efectivo</option>
+                  <option value="Tarjeta de débito">Tarjeta de débito</option>
+                  <option value="Tarjeta de crédito">Tarjeta de crédito</option>
+                  <option value="Transferencia">Transferencia</option>
+                </select>
+              </div>
+              <div className="col-span-2">
                 <label className="label">Descripción / Detalle</label>
                 <input type="text" value={fVar.descripcion} onChange={(e) => setFVar((f) => ({ ...f, descripcion: e.target.value }))} className={inputCls} placeholder="Lugar, motivo, detalle…" />
               </div>

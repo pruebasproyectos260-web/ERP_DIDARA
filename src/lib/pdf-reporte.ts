@@ -1,4 +1,6 @@
 import puppeteer from 'puppeteer-core'
+import type { PagoPDF } from './pdf-cotizacion'
+export type { PagoPDF }
 
 export interface ItemPDFReporte {
   descripcion: string
@@ -44,6 +46,7 @@ export interface DatosReportePDF {
   firma_cliente?: string
   firma_fecha?: string
   empresa?: EmpresaPDFReporte
+  pago?: PagoPDF
   estado: string
 }
 
@@ -302,13 +305,14 @@ function htmlReporte(d: DatosReportePDF): string {
 
   <!-- Firma y pago -->
   <div class="firma-section">
+    ${d.pago ? `
     <div class="payment-box">
       <div class="payment-title">Método de pago:</div>
-      Banco: BBVA<br>
-      Cuenta: 0480939986<br>
-      CLABE: 012180004809399868<br>
-      Titular: Pablo Alexander Ramírez Herrera
-    </div>
+      Banco: ${d.pago.banco}<br>
+      Cuenta: ${d.pago.cuenta}<br>
+      CLABE: ${d.pago.clabe}<br>
+      Titular: ${d.pago.titular}
+    </div>` : '<div></div>'}
     <div class="firma-box">
       ${firmaHtml}
       <div class="firma-label">Nombre y firma de quien corresponda la autorización:</div>

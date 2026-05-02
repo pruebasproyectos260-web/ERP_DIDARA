@@ -12,6 +12,7 @@ interface Props {
   productos: ProductoParaCot[]
   ivaDefault: number
   nivel: number
+  esContador: boolean
 }
 
 const ESTADOS: EstadoCotizacion[] = ['borrador', 'pendiente', 'enviada', 'aprobada', 'aceptada', 'rechazada', 'facturada', 'cancelada', 'pagada']
@@ -51,7 +52,7 @@ interface MailState {
   ok: boolean
 }
 
-export default function CotizacionesClient({ cotizaciones: inicial, clientes, productos, ivaDefault, nivel }: Props) {
+export default function CotizacionesClient({ cotizaciones: inicial, clientes, productos, ivaDefault, nivel, esContador }: Props) {
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>(inicial)
   const [modal, setModal] = useState<{ open: boolean; cotizacion: Cotizacion | null }>({ open: false, cotizacion: null })
   const [filtroEstado, setFiltroEstado] = useState('')
@@ -167,6 +168,8 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
   const puedeEditar = nivel <= 2
   const puedeEliminar = nivel <= 1
   const puedeVerGanancia = nivel <= 2
+  const puedeVerIVA = nivel <= 1 || esContador
+  const puedeCambiarEstado = nivel <= 2
 
   return (
     <div className="space-y-4">
@@ -228,7 +231,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
               <th className="text-left px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Fecha</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Cliente</th>
               <th className="text-right px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Total</th>
-              <th className="text-center px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">IVA</th>
+              {puedeVerIVA && <th className="text-center px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">IVA</th>}
               {puedeVerGanancia && (
                 <th className="text-right px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Ganancia</th>
               )}
@@ -241,7 +244,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
           <tbody className="divide-y divide-gray-100">
             {filtradas.length === 0 && (
               <tr>
-                <td colSpan={puedeVerGanancia ? 10 : 9} className="text-center py-12 text-gray-400">
+                <td colSpan={8 + (puedeVerIVA ? 1 : 0) + (puedeVerGanancia ? 1 : 0)} className="text-center py-12 text-gray-400">
                   No hay cotizaciones
                 </td>
               </tr>
@@ -257,13 +260,15 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
                   <td className="px-3 py-2.5 text-xs text-gray-700 whitespace-nowrap">{fmtDate(cot.fecha)}</td>
                   <td className="px-3 py-2.5 font-medium text-gray-900 max-w-[180px] truncate">{clienteNombre}</td>
                   <td className="px-3 py-2.5 text-right font-bold text-gray-900 whitespace-nowrap">{fmt$(cot.total)}</td>
-                  <td className="px-3 py-2.5 text-center">
-                    {cot.aplica_iva && cot.iva_monto > 0 ? (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 font-medium border border-yellow-200">{fmt$(cot.iva_monto)}</span>
-                    ) : (
-                      <span className="text-gray-300 text-xs">—</span>
-                    )}
-                  </td>
+                  {puedeVerIVA && (
+                    <td className="px-3 py-2.5 text-center">
+                      {cot.aplica_iva && cot.iva_monto > 0 ? (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 font-medium border border-yellow-200">{fmt$(cot.iva_monto)}</span>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
+                    </td>
+                  )}
                   {puedeVerGanancia && (
                     <td className="px-3 py-2.5 text-right whitespace-nowrap">
                       {cot.ganancia_total != null
@@ -274,15 +279,21 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
                   <td className="px-3 py-2.5 text-xs text-gray-600">{cot.quien_es_el_cliente ?? 'Didara'}</td>
                   <td className="px-3 py-2.5 text-xs text-gray-600 max-w-[140px] truncate">{cot.elaborado_por ?? '—'}</td>
                   <td className="px-3 py-2.5">
-                    <select
-                      value={cot.estado}
-                      onChange={(e) => cambiarEstado(cot.id, e.target.value as EstadoCotizacion)}
-                      className={`text-xs font-semibold px-2 py-1 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400 ${cfg.badge}`}
-                    >
-                      {ESTADOS.map((e) => (
-                        <option key={e} value={e}>{e.charAt(0).toUpperCase() + e.slice(1)}</option>
-                      ))}
-                    </select>
+                    {puedeCambiarEstado ? (
+                      <select
+                        value={cot.estado}
+                        onChange={(e) => cambiarEstado(cot.id, e.target.value as EstadoCotizacion)}
+                        className={`text-xs font-semibold px-2 py-1 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400 ${cfg.badge}`}
+                      >
+                        {ESTADOS.map((e) => (
+                          <option key={e} value={e}>{e.charAt(0).toUpperCase() + e.slice(1)}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-lg border ${cfg.badge}`}>
+                        {cot.estado.charAt(0).toUpperCase() + cot.estado.slice(1)}
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-1 justify-end">

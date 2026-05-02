@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
   const { searchParams } = new URL(req.url)
   const mes = searchParams.get('mes')   // '1'-'12'
   const anio = searchParams.get('anio') // '2026'
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
   const body = await req.json()
   const { data, error } = await supabase
     .from('gastos_variables')

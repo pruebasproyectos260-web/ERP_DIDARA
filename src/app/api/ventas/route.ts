@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
   const { searchParams } = new URL(req.url)
   const desde = searchParams.get('desde') ?? ''
   const hasta = searchParams.get('hasta') ?? ''
@@ -21,9 +21,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
+  const authClient = await createClient()
+  const supabase = createServiceClient()
   const body = await req.json()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await authClient.auth.getUser()
 
   const { data, error } = await supabase
     .from('ventas')

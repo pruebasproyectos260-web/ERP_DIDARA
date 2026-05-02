@@ -13,9 +13,9 @@ export default async function ClientesPage() {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: perfil } = await supabase
     .from('usuarios')
-    .select('nivel')
+    .select('nivel, es_contador')
     .eq('id', user!.id)
     .single()
 
-  return <ClientesClient clientes={clientes ?? []} nivel={perfil?.nivel ?? 2} />
+  return <ClientesClient clientes={clientes ?? []} nivel={perfil?.nivel ?? 2} esContador={perfil?.es_contador ?? false} />
 }

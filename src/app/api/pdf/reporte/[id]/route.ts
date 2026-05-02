@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { generarPDFReporte } from '@/lib/pdf-reporte'
 
 export async function GET(
@@ -7,7 +7,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   const [{ data: reporte, error }, { data: cfg }] = await Promise.all([
     supabase
@@ -29,7 +29,15 @@ export async function GET(
 
   const cliente = reporte.cliente as Record<string, string> | null
   const tecnico = tecnicoRow as Record<string, string> | null
-  const cfgRow  = cfg as Record<string, string> | null
+  const cfgRow  = cfg as Record<string, string | boolean | null> | null
+
+  const pagoMostrar = cfgRow?.pago_mostrar !== false
+  const pagoCfg = cfgRow && pagoMostrar && cfgRow.pago_banco ? {
+    banco:   String(cfgRow.pago_banco   ?? ''),
+    cuenta:  String(cfgRow.pago_cuenta  ?? ''),
+    clabe:   String(cfgRow.pago_clabe   ?? ''),
+    titular: String(cfgRow.pago_titular ?? ''),
+  } : undefined
 
   const items = Array.isArray(reporte.items)
     ? reporte.items.map((item: Record<string, unknown>) => ({
@@ -76,12 +84,13 @@ export async function GET(
       firma_fecha:   reporte.firma_fecha ?? undefined,
       estado:        reporte.estado ?? '',
       empresa: cfgRow ? {
-        nombre:    cfgRow.empresa_nombre    ?? 'DIDARA TI',
-        direccion: cfgRow.empresa_direccion ?? '',
-        telefono:  cfgRow.empresa_telefono  ?? '',
-        email:     cfgRow.empresa_email     ?? '',
-        web:       cfgRow.empresa_web       ?? '',
+        nombre:    String(cfgRow.empresa_nombre    ?? 'DIDARA TI'),
+        direccion: String(cfgRow.empresa_direccion ?? ''),
+        telefono:  String(cfgRow.empresa_telefono  ?? ''),
+        email:     String(cfgRow.empresa_email     ?? ''),
+        web:       String(cfgRow.empresa_web       ?? ''),
       } : undefined,
+      pago: pagoCfg,
     })
 
     return new NextResponse(new Uint8Array(pdfBuffer), {

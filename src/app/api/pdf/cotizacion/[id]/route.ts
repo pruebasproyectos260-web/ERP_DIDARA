@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { generarPDFCotizacion, type ItemPDF } from '@/lib/pdf-cotizacion'
 
 export async function GET(
@@ -7,7 +7,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   const [{ data: cot, error }, { data: cfg }] = await Promise.all([
     supabase
@@ -44,7 +44,15 @@ export async function GET(
     }
   })
 
-  const cfgRow = cfg as Record<string, string> | null
+  const cfgRow = cfg as Record<string, string | boolean | null> | null
+
+  const pagoMostrar = cfgRow?.pago_mostrar !== false
+  const pagoCfg = cfgRow && pagoMostrar && cfgRow.pago_banco ? {
+    banco:   String(cfgRow.pago_banco   ?? ''),
+    cuenta:  String(cfgRow.pago_cuenta  ?? ''),
+    clabe:   String(cfgRow.pago_clabe   ?? ''),
+    titular: String(cfgRow.pago_titular ?? ''),
+  } : undefined
 
   try {
     const pdfBuffer = await generarPDFCotizacion({
@@ -61,12 +69,13 @@ export async function GET(
       condiciones: cot.condiciones ?? undefined,
       elaborado_por: cot.elaborado_por ?? undefined,
       empresa: cfgRow ? {
-        nombre:    cfgRow.empresa_nombre    ?? 'DIDARA TI',
-        direccion: cfgRow.empresa_direccion ?? '',
-        telefono:  cfgRow.empresa_telefono  ?? '',
-        email:     cfgRow.empresa_email     ?? '',
-        web:       cfgRow.empresa_web       ?? '',
+        nombre:    String(cfgRow.empresa_nombre    ?? 'DIDARA TI'),
+        direccion: String(cfgRow.empresa_direccion ?? ''),
+        telefono:  String(cfgRow.empresa_telefono  ?? ''),
+        email:     String(cfgRow.empresa_email     ?? ''),
+        web:       String(cfgRow.empresa_web       ?? ''),
       } : undefined,
+      pago: pagoCfg,
       items,
     })
 

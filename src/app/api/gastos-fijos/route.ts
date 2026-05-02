@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET() {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('gastos_fijos')
     .select('*')
@@ -12,7 +12,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
   const body = await req.json()
   const { fecha_inicio, ...rest } = body
 
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function backfillRegistros(
-  supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server').createClient>>,
+  supabase: ReturnType<typeof import('@/lib/supabase/server').createServiceClient>,
   gastoFijoId: number,
   fechaInicio: string,
   monto: number

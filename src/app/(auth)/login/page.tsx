@@ -40,10 +40,20 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white">
-            Didara<span className="text-blue-400">ERP</span>
-          </h1>
-          <p className="mt-2 text-sm text-gray-400">Sistema de gestión</p>
+          <img
+            src="https://zoknsjiaizwxehznpgnk.supabase.co/storage/v1/object/public/logo/Imagen1.png"
+            alt="DIDARA TI"
+            className="h-20 w-auto object-contain mx-auto"
+            onError={(e) => {
+              const img = e.currentTarget
+              img.style.display = 'none'
+              const h1 = document.createElement('h1')
+              h1.className = 'text-3xl font-bold text-white'
+              h1.innerHTML = 'Didara<span class="text-blue-400">ERP</span>'
+              img.parentNode?.insertBefore(h1, img.nextSibling)
+            }}
+          />
+          <p className="mt-3 text-sm text-gray-400">Sistema de gestión</p>
         </div>
 
         {/* Card */}

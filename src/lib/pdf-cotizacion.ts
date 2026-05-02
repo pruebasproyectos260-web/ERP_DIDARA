@@ -17,6 +17,13 @@ export interface EmpresaPDF {
   web: string
 }
 
+export interface PagoPDF {
+  banco: string
+  cuenta: string
+  clabe: string
+  titular: string
+}
+
 export interface DatosCotizacionPDF {
   folio: string
   fecha: string
@@ -31,6 +38,7 @@ export interface DatosCotizacionPDF {
   condiciones?: string
   elaborado_por?: string
   empresa?: EmpresaPDF
+  pago?: PagoPDF
   items: ItemPDF[]
 }
 
@@ -210,13 +218,14 @@ ${logoSrc ? `<div class="watermark"></div>` : ''}
   <div class="gracias">Gracias por su preferencia.</div>
 
   <!-- Método de pago -->
+  ${d.pago ? `
   <div class="pago">
     <div class="title">Método de pago:</div>
-    Nombre del banco: BBVA<br>
-    Número de cuenta: 0480939986<br>
-    CLABE interbancaria: 012180004809399868<br>
-    Nombre del titular de la cuenta: Pablo Alexander Ramírez Herrera
-  </div>
+    Nombre del banco: ${d.pago.banco}<br>
+    Número de cuenta: ${d.pago.cuenta}<br>
+    CLABE interbancaria: ${d.pago.clabe}<br>
+    Nombre del titular de la cuenta: ${d.pago.titular}
+  </div>` : ''}
 
   <!-- Firma -->
   <div class="firma">

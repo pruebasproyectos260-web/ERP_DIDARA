@@ -23,7 +23,7 @@ export default async function CotizacionesPage() {
 
   const { data: perfil } = await supabase
     .from('usuarios')
-    .select('nivel')
+    .select('nivel, es_contador')
     .eq('id', user!.id)
     .single()
 
@@ -34,6 +34,7 @@ export default async function CotizacionesPage() {
       productos={productos ?? []}
       ivaDefault={configData?.iva_porcentaje ?? 16}
       nivel={perfil?.nivel ?? 2}
+      esContador={perfil?.es_contador ?? false}
     />
   )
 }

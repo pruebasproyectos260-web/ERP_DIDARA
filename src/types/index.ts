@@ -24,6 +24,11 @@ export interface Configuracion {
   empresa_telefono: string
   empresa_email: string
   empresa_web: string
+  pago_banco?: string
+  pago_cuenta?: string
+  pago_clabe?: string
+  pago_titular?: string
+  pago_mostrar?: boolean
   updated_at: string
   updated_by: string
 }
@@ -263,6 +268,7 @@ export interface GastoVariable {
   tipo: TipoGastoVariable
   descripcion?: string
   monto: number
+  metodo_pago?: string
   registrado_por?: string
   created_at: string
 }

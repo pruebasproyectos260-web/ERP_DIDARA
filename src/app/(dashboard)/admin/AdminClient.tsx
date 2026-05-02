@@ -30,6 +30,11 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
   const [empTelefono,  setEmpTelefono]  = useState(config?.empresa_telefono  ?? '')
   const [empEmail,     setEmpEmail]     = useState(config?.empresa_email     ?? '')
   const [empWeb,       setEmpWeb]       = useState(config?.empresa_web       ?? '')
+  const [pagoBanco,    setPagoBanco]    = useState(config?.pago_banco    ?? '')
+  const [pagoCuenta,   setPagoCuenta]   = useState(config?.pago_cuenta   ?? '')
+  const [pagoClabe,    setPagoClabe]    = useState(config?.pago_clabe    ?? '')
+  const [pagoTitular,  setPagoTitular]  = useState(config?.pago_titular  ?? '')
+  const [pagoMostrar,  setPagoMostrar]  = useState(config?.pago_mostrar  ?? true)
   const [savingConfig, setSavingConfig] = useState(false)
   const [configMsg,    setConfigMsg]    = useState('')
 
@@ -65,6 +70,11 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
         empresa_telefono:  empTelefono,
         empresa_email:     empEmail,
         empresa_web:       empWeb,
+        pago_banco:    pagoBanco    || null,
+        pago_cuenta:   pagoCuenta   || null,
+        pago_clabe:    pagoClabe    || null,
+        pago_titular:  pagoTitular  || null,
+        pago_mostrar:  pagoMostrar,
       }),
     })
     const json = await res.json()
@@ -292,6 +302,44 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
                 <label className="block text-sm font-medium text-gray-700 mb-1">Sitio web</label>
                 <input type="text" value={empWeb} onChange={(e) => setEmpWeb(e.target.value)} className={inputCls} placeholder="www.ejemplo.com" />
               </div>
+            </div>
+
+            {/* Datos de pago (PDF) */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-100 pb-2">
+                Datos de pago en PDFs
+              </h3>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={pagoMostrar}
+                  onChange={(e) => setPagoMostrar(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600"
+                />
+                <span className="text-sm text-gray-700">Mostrar sección de pago en cotizaciones y reportes PDF</span>
+              </label>
+              {pagoMostrar && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Banco</label>
+                      <input type="text" value={pagoBanco} onChange={(e) => setPagoBanco(e.target.value)} className={inputCls} placeholder="Ej. BBVA" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Número de cuenta</label>
+                      <input type="text" value={pagoCuenta} onChange={(e) => setPagoCuenta(e.target.value)} className={inputCls} placeholder="Ej. 0480939986" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">CLABE interbancaria</label>
+                    <input type="text" value={pagoClabe} onChange={(e) => setPagoClabe(e.target.value)} className={inputCls} placeholder="18 dígitos" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Titular de la cuenta</label>
+                    <input type="text" value={pagoTitular} onChange={(e) => setPagoTitular(e.target.value)} className={inputCls} placeholder="Nombre completo del titular" />
+                  </div>
+                </div>
+              )}
             </div>
 
             {configMsg && (

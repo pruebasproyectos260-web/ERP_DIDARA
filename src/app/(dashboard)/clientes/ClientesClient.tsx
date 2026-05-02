@@ -10,9 +10,10 @@ type Orden = 'id_asc' | 'id_desc' | 'nombre_az' | 'poliza'
 interface Props {
   clientes: Cliente[]
   nivel: number
+  esContador: boolean
 }
 
-export default function ClientesClient({ clientes: inicial, nivel }: Props) {
+export default function ClientesClient({ clientes: inicial, nivel, esContador }: Props) {
   const [clientes, setClientes] = useState<Cliente[]>(inicial)
   const [busqueda, setBusqueda] = useState('')
   const [modal, setModal] = useState<{ open: boolean; cliente: Cliente | null }>({ open: false, cliente: null })
@@ -59,8 +60,11 @@ export default function ClientesClient({ clientes: inicial, nivel }: Props) {
     setModal({ open: false, cliente: null })
   }
 
-  const puedeEditar = nivel <= 2
-  const puedeEliminar = nivel <= 1
+  const puedeEditar    = nivel <= 2
+  const puedeEliminar  = nivel <= 1
+  const verDescuento   = nivel <= 1
+  const verFiscal      = nivel <= 1 || esContador
+  const gridTemplate = ['3rem', '1fr', verDescuento && '5.5rem', verFiscal && '7rem', verFiscal && '5rem', '14rem', '5rem'].filter(Boolean).join(' ')
 
   const ordenOpciones: { value: Orden; label: string }[] = [
     { value: 'id_asc',    label: 'ID ↑' },
@@ -118,12 +122,12 @@ export default function ClientesClient({ clientes: inicial, nivel }: Props) {
       {/* Tabla */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {/* Encabezado */}
-        <div className="grid grid-cols-[3rem_1fr_5.5rem_7rem_5rem_14rem_5rem] bg-gray-50 border-b border-gray-200 px-3 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">
+        <div className="grid bg-gray-50 border-b border-gray-200 px-3 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide" style={{ gridTemplateColumns: gridTemplate }}>
           <div>ID</div>
           <div>Nombre / Razón social</div>
-          <div className="text-center">Desc.</div>
-          <div>Régimen</div>
-          <div>CFDI</div>
+          {verDescuento && <div className="text-center">Desc.</div>}
+          {verFiscal && <div>Régimen</div>}
+          {verFiscal && <div>CFDI</div>}
           <div>Direcciones y contactos</div>
           <div className="text-right">Acc.</div>
         </div>
@@ -143,7 +147,7 @@ export default function ClientesClient({ clientes: inicial, nivel }: Props) {
             const contactosGral = cliente.contactos?.filter(c => c.nombre || c.email) ?? []
 
             return (
-              <div key={cliente.id} className="grid grid-cols-[3rem_1fr_5.5rem_7rem_5rem_14rem_5rem] items-start px-3 py-3 hover:bg-gray-50 transition-colors">
+              <div key={cliente.id} className="grid items-start px-3 py-3 hover:bg-gray-50 transition-colors" style={{ gridTemplateColumns: gridTemplate }}>
 
                 {/* ID */}
                 <div className="text-sm font-bold text-blue-600 pt-0.5">#{cliente.id}</div>
@@ -165,27 +169,33 @@ export default function ClientesClient({ clientes: inicial, nivel }: Props) {
                 </div>
 
                 {/* Descuento */}
-                <div className="text-center pt-0.5">
-                  {cliente.descuento !== 0 ? (
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      cliente.descuento > 0 ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'
-                    }`}>
-                      {cliente.descuento > 0 ? '+' : ''}{cliente.descuento}%
-                    </span>
-                  ) : (
-                    <span className="text-xs text-gray-300">—</span>
-                  )}
-                </div>
+                {verDescuento && (
+                  <div className="text-center pt-0.5">
+                    {cliente.descuento !== 0 ? (
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        cliente.descuento > 0 ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'
+                      }`}>
+                        {cliente.descuento > 0 ? '+' : ''}{cliente.descuento}%
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-300">—</span>
+                    )}
+                  </div>
+                )}
 
                 {/* Régimen fiscal */}
-                <div className="text-xs text-gray-600 pt-0.5">
-                  {cliente.regimen_fiscal ?? <span className="text-gray-300">—</span>}
-                </div>
+                {verFiscal && (
+                  <div className="text-xs text-gray-600 pt-0.5">
+                    {cliente.regimen_fiscal ?? <span className="text-gray-300">—</span>}
+                  </div>
+                )}
 
                 {/* CFDI */}
-                <div className="text-xs text-gray-600 font-mono pt-0.5">
-                  {cliente.uso_cfdi ?? <span className="text-gray-300">—</span>}
-                </div>
+                {verFiscal && (
+                  <div className="text-xs text-gray-600 font-mono pt-0.5">
+                    {cliente.uso_cfdi ?? <span className="text-gray-300">—</span>}
+                  </div>
+                )}
 
                 {/* Direcciones — expansión inline dentro de la columna */}
                 <div className="space-y-1.5">

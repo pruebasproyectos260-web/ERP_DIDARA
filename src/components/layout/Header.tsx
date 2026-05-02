@@ -1,14 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LogOut, User, ChevronDown } from 'lucide-react'
+import { LogOut, ChevronDown, Moon, Sun } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 interface Props {
   user: SupabaseUser
   perfil: { nombre: string; nivel: number } | null
+  esContador?: boolean
 }
 
 const nivelLabel: Record<number, string> = {
@@ -18,9 +19,23 @@ const nivelLabel: Record<number, string> = {
   3: 'Restringido',
 }
 
-export default function Header({ user, perfil }: Props) {
+export default function Header({ user, perfil, esContador }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    const saved = localStorage.getItem('darkMode') === 'true'
+    setDarkMode(saved)
+    document.body.classList.toggle('dark-mode', saved)
+  }, [])
+
+  function toggleDark() {
+    const next = !darkMode
+    setDarkMode(next)
+    localStorage.setItem('darkMode', String(next))
+    document.body.classList.toggle('dark-mode', next)
+  }
 
   async function cerrarSesion() {
     const supabase = createClient()
@@ -29,29 +44,40 @@ export default function Header({ user, perfil }: Props) {
     router.refresh()
   }
 
+  const subLabel = esContador ? 'Contador' : (nivelLabel[perfil?.nivel ?? 2] ?? 'Estándar')
+
   return (
-    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-end px-6 gap-4">
+    <header className="h-14 bg-[var(--surface)] border-b border-[var(--border)] flex items-center justify-end px-6 gap-3">
+
+      {/* Dark mode toggle */}
+      <button
+        onClick={toggleDark}
+        title={darkMode ? 'Modo claro' : 'Modo oscuro'}
+        className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors"
+      >
+        {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+      </button>
+
+      {/* User menu */}
       <div className="relative">
         <button
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900 transition-colors"
+          className="flex items-center gap-2 text-sm text-[var(--text)] hover:text-[var(--text)] transition-colors"
         >
           <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
             {(perfil?.nombre ?? user.email ?? 'U')[0].toUpperCase()}
           </div>
           <div className="text-left hidden sm:block">
             <p className="font-medium leading-none">{perfil?.nombre ?? user.email}</p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {nivelLabel[perfil?.nivel ?? 2]}
-            </p>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">{subLabel}</p>
           </div>
-          <ChevronDown size={14} className="text-gray-400" />
+          <ChevronDown size={14} className="text-[var(--text-muted)]" />
         </button>
 
         {open && (
-          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-            <div className="px-4 py-2 border-b border-gray-100">
-              <p className="text-xs text-gray-500 truncate">{user.email}</p>
+          <div className="absolute right-0 mt-2 w-48 bg-[var(--surface)] rounded-lg shadow-lg border border-[var(--border)] py-1 z-50">
+            <div className="px-4 py-2 border-b border-[var(--border)]">
+              <p className="text-xs text-[var(--text-muted)] truncate">{user.email}</p>
             </div>
             <button
               onClick={cerrarSesion}

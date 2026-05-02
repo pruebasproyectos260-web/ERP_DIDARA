@@ -73,8 +73,9 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
     setModal({ open: false, producto: null })
   }
 
-  const puedeEditar = nivel <= 2
-  const puedeEliminar = nivel <= 1
+  const puedeEditar     = nivel <= 1
+  const puedeEliminar   = nivel <= 1
+  const puedeVerPrecios = nivel <= 1
 
   return (
     <div className="space-y-4">
@@ -114,10 +115,12 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Stock bajo (≤mín)</p>
           <p className={`text-2xl font-bold mt-1 ${stockBajo > 0 ? 'text-amber-600' : 'text-gray-700'}`}>{stockBajo}</p>
         </button>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Valor de inventario</p>
-          <p className="text-xl font-bold text-green-600 mt-1">{fmt$(valorInventario)}</p>
-        </div>
+        {puedeVerPrecios && (
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Valor de inventario</p>
+            <p className="text-xl font-bold text-green-600 mt-1">{fmt$(valorInventario)}</p>
+          </div>
+        )}
       </div>
 
       {/* Búsqueda */}
@@ -170,8 +173,8 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
               <th className="text-left px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Nombre</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Descripción</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Categorías</th>
-              <th className="text-right px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">P. Compra</th>
-              <th className="text-right px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">P. Venta</th>
+              {puedeVerPrecios && <th className="text-right px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">P. Compra</th>}
+              {puedeVerPrecios && <th className="text-right px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">P. Venta</th>}
               <th className="text-right px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Stock</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Unidad</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">C. SAT Unidad</th>
@@ -182,7 +185,7 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
           <tbody className="divide-y divide-gray-100">
             {filtrados.length === 0 && (
               <tr>
-                <td colSpan={12} className="text-center py-12 text-gray-400">No se encontraron productos</td>
+                <td colSpan={10 + (puedeVerPrecios ? 2 : 0)} className="text-center py-12 text-gray-400">No se encontraron productos</td>
               </tr>
             )}
             {filtrados.map((p) => {
@@ -229,19 +232,23 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
                   </td>
 
                   {/* P. Compra */}
-                  <td className="px-3 py-2.5 text-right">
-                    <div className="text-xs font-medium text-gray-800">{fmt$(p.precio_compra_neto)}</div>
-                    {p.precio_compra_incluye_iva ? (
-                      <div className="text-[10px] text-gray-400">incl. IVA</div>
-                    ) : (
-                      <div className="text-[10px] text-gray-400">+IVA {p.iva_compra}% → {fmt$(p.precio_compra_con_iva)}</div>
-                    )}
-                  </td>
+                  {puedeVerPrecios && (
+                    <td className="px-3 py-2.5 text-right">
+                      <div className="text-xs font-medium text-gray-800">{fmt$(p.precio_compra_neto)}</div>
+                      {p.precio_compra_incluye_iva ? (
+                        <div className="text-[10px] text-gray-400">incl. IVA</div>
+                      ) : (
+                        <div className="text-[10px] text-gray-400">+IVA {p.iva_compra}% → {fmt$(p.precio_compra_con_iva)}</div>
+                      )}
+                    </td>
+                  )}
 
                   {/* P. Venta */}
-                  <td className="px-3 py-2.5 text-right">
-                    <span className="text-xs font-bold text-green-700">{fmt$(p.precio_venta)}</span>
-                  </td>
+                  {puedeVerPrecios && (
+                    <td className="px-3 py-2.5 text-right">
+                      <span className="text-xs font-bold text-green-700">{fmt$(p.precio_venta)}</span>
+                    </td>
+                  )}
 
                   {/* Stock */}
                   <td className="px-3 py-2.5 text-right">
