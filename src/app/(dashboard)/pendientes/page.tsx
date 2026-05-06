@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { Plus, Pencil, Trash2, X, Check } from 'lucide-react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { Plus, Pencil, Trash2, X, Check, AlertTriangle } from 'lucide-react'
 import type { Pendiente, Cliente, Usuario } from '@/types'
 
 const ESTADOS: Pendiente['estado'][] = ['Pendiente', 'Completado']
@@ -15,6 +15,12 @@ function fmt(dateStr?: string) {
   if (!dateStr) return '—'
   const [y, m, d] = dateStr.split('-')
   return `${d}/${m}/${y}`
+}
+
+function esVencido(p: Pendiente) {
+  if (!p.fecha_max_entrega || p.estado === 'Completado') return false
+  const hoy = new Date().toISOString().slice(0, 10)
+  return p.fecha_max_entrega < hoy
 }
 
 const FORM_VACIO = {
@@ -39,6 +45,11 @@ export default function PendientesPage() {
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
 
+  // Autocomplete cliente
+  const [clienteBusqueda, setClienteBusqueda] = useState('')
+  const [clienteDropdown, setClienteDropdown] = useState(false)
+  const clienteRef = useRef<HTMLDivElement>(null)
+
   const [filtroEstado, setFiltroEstado] = useState<string>('')
 
   useEffect(() => {
@@ -54,7 +65,23 @@ export default function PendientesPage() {
     })
   }, [])
 
-  // Contactos del cliente seleccionado
+  // Cerrar dropdown al hacer click fuera
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (clienteRef.current && !clienteRef.current.contains(e.target as Node)) {
+        setClienteDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const clientesFiltrados = useMemo(() => {
+    if (!clienteBusqueda.trim()) return clientes.slice(0, 8)
+    const q = clienteBusqueda.toLowerCase()
+    return clientes.filter(c => c.nombre.toLowerCase().includes(q)).slice(0, 8)
+  }, [clienteBusqueda, clientes])
+
   const contactosCliente = useMemo(() => {
     if (!form.cliente_id) return []
     const cli = clientes.find(c => c.id.toString() === form.cliente_id)
@@ -65,9 +92,21 @@ export default function PendientesPage() {
     return pendientes.filter(p => !filtroEstado || p.estado === filtroEstado)
   }, [pendientes, filtroEstado])
 
+  function seleccionarCliente(c: Pick<Cliente, 'id' | 'nombre' | 'contactos'>) {
+    setForm(f => ({ ...f, cliente_id: c.id.toString(), contacto_nombre: '' }))
+    setClienteBusqueda(c.nombre)
+    setClienteDropdown(false)
+  }
+
+  function limpiarCliente() {
+    setForm(f => ({ ...f, cliente_id: '', contacto_nombre: '' }))
+    setClienteBusqueda('')
+  }
+
   function abrirNuevo() {
     setEditando(null)
     setForm({ ...FORM_VACIO, fecha_solicitud: new Date().toISOString().slice(0, 10) })
+    setClienteBusqueda('')
     setError('')
     setModal(true)
   }
@@ -83,6 +122,7 @@ export default function PendientesPage() {
       fecha_max_entrega: p.fecha_max_entrega ?? '',
       estado: p.estado,
     })
+    setClienteBusqueda(p.cliente_nombre ?? '')
     setError('')
     setModal(true)
   }
@@ -106,7 +146,7 @@ export default function PendientesPage() {
     const clienteSeleccionado = clientes.find(c => c.id.toString() === form.cliente_id)
     const payload = {
       cliente_id: form.cliente_id ? parseInt(form.cliente_id) : null,
-      cliente_nombre: clienteSeleccionado?.nombre ?? null,
+      cliente_nombre: clienteSeleccionado?.nombre ?? (clienteBusqueda || null),
       contacto_nombre: form.contacto_nombre || null,
       tecnico_ids: form.tecnico_ids,
       descripcion: form.descripcion,
@@ -153,7 +193,14 @@ export default function PendientesPage() {
       body: JSON.stringify({ estado: nuevoEstado }),
     })
     const json = await res.json()
-    if (res.ok) setPendientes(prev => prev.map(item => item.id === p.id ? json.data : item))
+    if (res.ok) {
+      if (nuevoEstado === 'Completado') {
+        // Se eliminará automáticamente en 2 días; solo actualizamos en UI
+        setPendientes(prev => prev.map(item => item.id === p.id ? json.data : item))
+      } else {
+        setPendientes(prev => prev.map(item => item.id === p.id ? json.data : item))
+      }
+    }
   }
 
   const techName = (id: string) => usuarios.find(u => u.id === id)?.nombre ?? id
@@ -216,58 +263,73 @@ export default function PendientesPage() {
                   <td colSpan={8} className="text-center py-12 text-gray-400">No hay pendientes</td>
                 </tr>
               )}
-              {filtrados.map(p => (
-                <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-900 max-w-[140px]">
-                    {p.cliente_nombre ?? <span className="text-gray-400">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 max-w-[130px]">
-                    {p.contacto_nombre ?? <span className="text-gray-400">—</span>}
-                  </td>
-                  <td className="px-4 py-3 max-w-[160px]">
-                    {p.tecnico_ids.length === 0 ? (
-                      <span className="text-gray-400">—</span>
-                    ) : (
-                      <div className="flex flex-wrap gap-1">
-                        {p.tecnico_ids.map(id => (
-                          <span key={id} className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
-                            {techName(id)}
-                          </span>
-                        ))}
+              {filtrados.map(p => {
+                const vencido = esVencido(p)
+                return (
+                  <tr
+                    key={p.id}
+                    className={`transition-colors ${vencido ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-gray-50'}`}
+                  >
+                    <td className="px-4 py-3 font-medium max-w-[140px]">
+                      <div className="flex items-center gap-1">
+                        {vencido && <AlertTriangle size={12} className="text-red-500 shrink-0" />}
+                        <span className={vencido ? 'text-red-700' : 'text-gray-900'}>
+                          {p.cliente_nombre ?? <span className="text-gray-400 font-normal">—</span>}
+                        </span>
                       </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-700 max-w-[200px]">
-                    <p className="line-clamp-2 text-xs">{p.descripcion}</p>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{fmt(p.fecha_solicitud)}</td>
-                  <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{fmt(p.fecha_max_entrega)}</td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => toggleEstado(p)}
-                      className={`text-xs px-2.5 py-1 rounded-full font-medium transition-opacity hover:opacity-75 ${estadoColor[p.estado]}`}
-                    >
-                      {p.estado}
-                    </button>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 justify-end">
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 max-w-[130px]">
+                      {p.contacto_nombre ?? <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="px-4 py-3 max-w-[160px]">
+                      {p.tecnico_ids.length === 0 ? (
+                        <span className="text-gray-400">—</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {p.tecnico_ids.map(id => (
+                            <span key={id} className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
+                              {techName(id)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 max-w-[200px]">
+                      <p className="line-clamp-2 text-xs">{p.descripcion}</p>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{fmt(p.fecha_solicitud)}</td>
+                    <td className="px-4 py-3 text-xs whitespace-nowrap">
+                      <span className={vencido ? 'text-red-600 font-semibold' : 'text-gray-600'}>
+                        {fmt(p.fecha_max_entrega)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
                       <button
-                        onClick={() => abrirEditar(p)}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        onClick={() => toggleEstado(p)}
+                        className={`text-xs px-2.5 py-1 rounded-full font-medium transition-opacity hover:opacity-75 ${estadoColor[p.estado]}`}
                       >
-                        <Pencil size={13} />
+                        {p.estado}
                       </button>
-                      <button
-                        onClick={() => eliminar(p.id)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1 justify-end">
+                        <button
+                          onClick={() => abrirEditar(p)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          onClick={() => eliminar(p.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}
@@ -287,19 +349,64 @@ export default function PendientesPage() {
             </div>
 
             <form onSubmit={guardar} className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
-              {/* Cliente */}
+
+              {/* Autocomplete cliente */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
-                <select
-                  value={form.cliente_id}
-                  onChange={e => setForm(f => ({ ...f, cliente_id: e.target.value, contacto_nombre: '' }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Sin cliente</option>
-                  {clientes.map(c => (
-                    <option key={c.id} value={c.id}>{c.nombre}</option>
-                  ))}
-                </select>
+                <div ref={clienteRef} className="relative">
+                  <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500">
+                    <input
+                      type="text"
+                      value={clienteBusqueda}
+                      onChange={e => {
+                        setClienteBusqueda(e.target.value)
+                        setForm(f => ({ ...f, cliente_id: '', contacto_nombre: '' }))
+                        setClienteDropdown(true)
+                      }}
+                      onFocus={() => setClienteDropdown(true)}
+                      placeholder="Buscar cliente..."
+                      className="flex-1 px-3 py-2 text-sm outline-none"
+                    />
+                    {clienteBusqueda && (
+                      <button
+                        type="button"
+                        onClick={limpiarCliente}
+                        className="px-2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                  {clienteDropdown && clientesFiltrados.length > 0 && (
+                    <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      <li>
+                        <button
+                          type="button"
+                          onClick={limpiarCliente}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-400 hover:bg-gray-50"
+                        >
+                          Sin cliente
+                        </button>
+                      </li>
+                      {clientesFiltrados.map(c => (
+                        <li key={c.id}>
+                          <button
+                            type="button"
+                            onClick={() => seleccionarCliente(c)}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 ${
+                              form.cliente_id === c.id.toString() ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
+                            }`}
+                          >
+                            {c.nombre}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                {form.cliente_id && (
+                  <p className="text-[10px] text-green-600 mt-0.5">Cliente seleccionado</p>
+                )}
               </div>
 
               {/* Contacto responsable */}

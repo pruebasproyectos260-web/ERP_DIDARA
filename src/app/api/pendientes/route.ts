@@ -4,6 +4,14 @@ import { createServiceClient } from '@/lib/supabase/server'
 export async function GET() {
   const supabase = createServiceClient()
 
+  // Auto-eliminar completados con más de 2 días
+  const hace2Dias = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+  await supabase
+    .from('pendientes')
+    .delete()
+    .eq('estado', 'Completado')
+    .lt('updated_at', hace2Dias)
+
   const { data, error } = await supabase
     .from('pendientes')
     .select('*')
