@@ -2,8 +2,10 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const ALLOWED_ORIGINS = [
-  process.env.NEXT_PUBLIC_APP_URL ?? 'https://erp-didara.onrender.com',
+  'https://erp-didara.onrender.com',
   'http://localhost:3000',
+  'http://localhost:3001',
+  ...(process.env.NEXT_PUBLIC_APP_URL ? [process.env.NEXT_PUBLIC_APP_URL] : []),
 ]
 
 export async function middleware(request: NextRequest) {
@@ -60,6 +62,9 @@ export async function middleware(request: NextRequest) {
   const isPublic = publicPaths.some((p) => pathname.startsWith(p))
 
   if (!user && !isPublic) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

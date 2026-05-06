@@ -60,45 +60,55 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
     e.preventDefault()
     setSavingConfig(true)
     setConfigMsg('')
-    const res = await fetch('/api/admin/configuracion', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        iva_porcentaje:   parseFloat(iva),
-        empresa_nombre:    empNombre,
-        empresa_direccion: empDireccion,
-        empresa_telefono:  empTelefono,
-        empresa_email:     empEmail,
-        empresa_web:       empWeb,
-        pago_banco:    pagoBanco    || null,
-        pago_cuenta:   pagoCuenta   || null,
-        pago_clabe:    pagoClabe    || null,
-        pago_titular:  pagoTitular  || null,
-        pago_mostrar:  pagoMostrar,
-      }),
-    })
-    const json = await res.json()
-    setSavingConfig(false)
-    if (!res.ok) return setConfigMsg(`Error: ${json.error}`)
-    setConfig(json.data)
-    setConfigMsg('Configuración guardada.')
+    try {
+      const res = await fetch('/api/admin/configuracion', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          iva_porcentaje:   parseFloat(iva),
+          empresa_nombre:    empNombre,
+          empresa_direccion: empDireccion,
+          empresa_telefono:  empTelefono,
+          empresa_email:     empEmail,
+          empresa_web:       empWeb,
+          pago_banco:    pagoBanco    || null,
+          pago_cuenta:   pagoCuenta   || null,
+          pago_clabe:    pagoClabe    || null,
+          pago_titular:  pagoTitular  || null,
+          pago_mostrar:  pagoMostrar,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) return setConfigMsg(`Error: ${json.error}`)
+      setConfig(json.data)
+      setConfigMsg('Configuración guardada.')
+    } catch {
+      setConfigMsg('Error de red. Intenta de nuevo.')
+    } finally {
+      setSavingConfig(false)
+    }
   }
 
   async function crearUsuario(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setSavingUser(true)
     setUserError('')
-    const res = await fetch('/api/admin/usuarios', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...nuevoUser, nivel: parseInt(nuevoUser.nivel) }),
-    })
-    const json = await res.json()
-    setSavingUser(false)
-    if (!res.ok) return setUserError(json.error ?? 'Error al crear usuario')
-    setUsuarios((prev) => [...prev, json.data])
-    setModalUsuario(false)
-    setNuevoUser({ username: '', password: '', nombre: '', correo: '', nivel: '2', es_contador: false })
+    try {
+      const res = await fetch('/api/admin/usuarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...nuevoUser, nivel: parseInt(nuevoUser.nivel) }),
+      })
+      const json = await res.json()
+      if (!res.ok) return setUserError(json.error ?? 'Error al crear usuario')
+      setUsuarios((prev) => [...prev, json.data])
+      setModalUsuario(false)
+      setNuevoUser({ username: '', password: '', nombre: '', correo: '', nivel: '2', es_contador: false })
+    } catch {
+      setUserError('Error de red. Intenta de nuevo.')
+    } finally {
+      setSavingUser(false)
+    }
   }
 
   function abrirEditUser(u: Usuario) {
@@ -125,16 +135,21 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
       correo:      editUser.correo,
     }
     if (editUser.nueva_contrasena) body.nueva_contrasena = editUser.nueva_contrasena
-    const res = await fetch(`/api/admin/usuarios/${modalEditUser.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    const json = await res.json()
-    setSavingEdit(false)
-    if (!res.ok) return setEditError(json.error ?? 'Error al editar usuario')
-    setUsuarios((prev) => prev.map((u) => (u.id === modalEditUser.id ? json.data : u)))
-    setModalEditUser(null)
+    try {
+      const res = await fetch(`/api/admin/usuarios/${modalEditUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (!res.ok) return setEditError(json.error ?? 'Error al editar usuario')
+      setUsuarios((prev) => prev.map((u) => (u.id === modalEditUser.id ? json.data : u)))
+      setModalEditUser(null)
+    } catch {
+      setEditError('Error de red. Intenta de nuevo.')
+    } finally {
+      setSavingEdit(false)
+    }
   }
 
   async function desactivarUsuario(u: Usuario) {

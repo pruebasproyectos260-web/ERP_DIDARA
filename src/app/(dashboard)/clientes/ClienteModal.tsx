@@ -120,14 +120,19 @@ export default function ClienteModal({ cliente, onClose, onGuardado }: Props) {
       contactos: contactosFiltrados,
     }
 
-    const res = await fetch(
-      esNuevo ? '/api/clientes' : `/api/clientes/${cliente.id}`,
-      { method: esNuevo ? 'POST' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
-    )
-    const json = await res.json()
-    setLoading(false)
-    if (!res.ok) return setError(json.error ?? 'Error al guardar')
-    onGuardado(json.data)
+    try {
+      const res = await fetch(
+        esNuevo ? '/api/clientes' : `/api/clientes/${cliente.id}`,
+        { method: esNuevo ? 'POST' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+      )
+      const json = await res.json()
+      if (!res.ok) return setError(json.error ?? 'Error al guardar')
+      onGuardado(json.data)
+    } catch {
+      setError('Error de red. Intenta de nuevo.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

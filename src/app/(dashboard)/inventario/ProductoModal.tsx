@@ -74,19 +74,23 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
       imagen_url: form.imagen_url || null,
     }
 
-    const res = await fetch(
-      esNuevo ? '/api/inventario' : `/api/inventario/${producto.id}`,
-      {
-        method: esNuevo ? 'POST' : 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      }
-    )
-
-    const json = await res.json()
-    setLoading(false)
-    if (!res.ok) return setError(json.error ?? 'Error al guardar')
-    onGuardado(json.data)
+    try {
+      const res = await fetch(
+        esNuevo ? '/api/inventario' : `/api/inventario/${producto.id}`,
+        {
+          method: esNuevo ? 'POST' : 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      )
+      const json = await res.json()
+      if (!res.ok) return setError(json.error ?? 'Error al guardar')
+      onGuardado(json.data)
+    } catch {
+      setError('Error de red. Intenta de nuevo.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
