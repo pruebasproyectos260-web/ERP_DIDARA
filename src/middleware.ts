@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const ALLOWED_ORIGINS = [
+  'https://erp.didara-ti.com',
   'https://erp-didara.onrender.com',
   'http://localhost:3000',
   'http://localhost:3001',
