@@ -273,6 +273,24 @@ export interface GastoVariable {
   created_at: string
 }
 
+// ─── Pendientes ───────────────────────────────────────────────────────────────
+
+export type EstadoPendiente = 'Pendiente' | 'Completado'
+
+export interface Pendiente {
+  id: number
+  cliente_id?: number
+  cliente_nombre?: string
+  contacto_nombre?: string
+  tecnico_ids: string[]
+  descripcion: string
+  fecha_solicitud: string
+  fecha_max_entrega?: string
+  estado: EstadoPendiente
+  created_at: string
+  updated_at: string
+}
+
 // ─── API responses ────────────────────────────────────────────────────────────
 
 export interface ApiResponse<T = unknown> {

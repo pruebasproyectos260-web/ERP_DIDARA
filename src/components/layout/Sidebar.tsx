@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Receipt,
   Settings,
+  ClipboardList,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -33,6 +34,7 @@ const navItems: NavItem[] = [
   { href: '/cotizaciones', label: 'Cotizaciones', icon: FileText,        nivelMinimo: 0 },
   { href: '/reportes',     label: 'Reportes',     icon: Wrench,          nivelMinimo: 0 },
   { href: '/agenda',       label: 'Agenda',       icon: Calendar,        nivelMinimo: 0 },
+  { href: '/pendientes',   label: 'Pendientes',   icon: ClipboardList,   nivelMinimo: 0 },
   { href: '/ventas',       label: 'Ventas',       icon: TrendingUp,      nivelMinimo: 0, nivelMaximo: 3 },
   { href: '/gastos',       label: 'Gastos',       icon: Receipt,         nivelMinimo: 0, nivelMaximo: 3 },
   { href: '/admin',        label: 'Admin',        icon: Settings,        nivelMinimo: 0, nivelMaximo: 2 },

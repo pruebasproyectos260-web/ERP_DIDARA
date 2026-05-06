@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import type { Producto } from '@/types'
 
+const CATEGORIAS_OPCIONES = [
+  'CCTV', 'Redes', 'Energía', 'Telefonía', 'Cómputo',
+  'Impresoras', 'Consumibles', 'Instalación', 'Mantenimiento',
+  'Seguridad', 'Automatización', 'Audio y Video', 'Acceso',
+]
+
 interface Props {
   producto: Producto | null
   ivaDefault: number
@@ -15,11 +21,8 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
   const esNuevo = !producto
 
   const [form, setForm] = useState({
-    codigo: producto?.codigo ?? '',
     nombre: producto?.nombre ?? '',
     descripcion: producto?.descripcion ?? '',
-    categoria: producto?.categoria ?? '',
-    categorias: producto?.categorias ?? '',
     unidad: producto?.unidad ?? 'pza',
     precio_venta: producto?.precio_venta?.toString() ?? '0',
     precio_compra_neto: producto?.precio_compra_neto?.toString() ?? '0',
@@ -30,6 +33,11 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
     clave_sat_producto: producto?.clave_sat_producto ?? '',
     clave_sat_unidad: producto?.clave_sat_unidad ?? '',
     imagen_url: producto?.imagen_url ?? '',
+  })
+
+  const [categoriasSeleccionadas, setCategoriasSeleccionadas] = useState<string[]>(() => {
+    const raw = producto?.categorias ?? producto?.categoria ?? ''
+    return raw ? raw.split(';').map(c => c.trim()).filter(Boolean) : []
   })
 
   const [precioConIva, setPrecioConIva] = useState(0)
@@ -50,18 +58,24 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function toggleCategoria(cat: string) {
+    setCategoriasSeleccionadas(prev =>
+      prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
+    )
+  }
+
+  async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault()
     if (!form.nombre.trim()) return setError('El nombre es requerido')
     setLoading(true)
     setError('')
 
+    const categoriasStr = categoriasSeleccionadas.join(';')
     const payload = {
-      codigo: form.codigo || null,
       nombre: form.nombre,
       descripcion: form.descripcion || null,
-      categoria: form.categoria || null,
-      categorias: form.categorias || null,
+      categoria: categoriasSeleccionadas[0] ?? null,
+      categorias: categoriasStr || null,
       unidad: form.unidad,
       precio_venta: parseFloat(form.precio_venta) || 0,
       precio_compra_neto: parseFloat(form.precio_compra_neto) || 0,
@@ -107,16 +121,7 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
 
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Código</label>
-              <input
-                type="text"
-                value={form.codigo}
-                onChange={(e) => setField('codigo', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
+            <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Nombre <span className="text-red-500">*</span>
               </label>
@@ -127,17 +132,32 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Categorías</label>
-              <input
-                type="text"
-                value={form.categorias}
-                onChange={(e) => setField('categorias', e.target.value)}
-                placeholder="CCTV;Redes;Energía"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="text-[10px] text-gray-400 mt-0.5">Separa con punto y coma (;)</p>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Categorías</label>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORIAS_OPCIONES.map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => toggleCategoria(cat)}
+                    className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${
+                      categoriasSeleccionadas.includes(cat)
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              {categoriasSeleccionadas.length > 0 && (
+                <p className="text-[10px] text-gray-400 mt-1">
+                  Seleccionadas: {categoriasSeleccionadas.join(', ')}
+                </p>
+              )}
             </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Unidad</label>
               <select
@@ -150,6 +170,7 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
                 ))}
               </select>
             </div>
+
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
               <textarea
@@ -300,7 +321,7 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
             Cancelar
           </button>
           <button
-            onClick={handleSubmit as never}
+            onClick={handleSubmit}
             disabled={loading}
             className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-lg transition-colors"
           >
