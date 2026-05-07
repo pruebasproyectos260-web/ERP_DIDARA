@@ -15,7 +15,7 @@ export default async function CotizacionesPage() {
       .from('cotizaciones')
       .select('*, cliente:clientes(id, nombre), items:cotizacion_items(*)')
       .order('created_at', { ascending: false }),
-    supabase.from('clientes').select('id, nombre, rfc, uso_cfdi, regimen_fiscal, direcciones, contactos').eq('activo', true).order('nombre'),
+    supabase.from('clientes').select('id, nombre, rfc, uso_cfdi, regimen_fiscal, descuento, direcciones, contactos').eq('activo', true).order('nombre'),
     supabase.from('productos').select('id, nombre, precio_venta, precio_compra_neto, unidad, imagen_url').eq('activo', true).order('nombre'),
     supabase.from('configuracion').select('iva_porcentaje').single(),
     supabase.auth.getUser(),

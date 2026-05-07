@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
   // Retornar cotización completa
   const { data: completa } = await supabase
     .from('cotizaciones')
-    .select('*, cliente:clientes(id, nombre), cotizacion_items(*)')
+    .select('*, cliente:clientes(id, nombre), items:cotizacion_items(*)')
     .eq('id', cotizacion.id)
     .single()
 

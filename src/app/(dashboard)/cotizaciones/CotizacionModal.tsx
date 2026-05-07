@@ -11,6 +11,7 @@ export type ClienteParaCot = {
   rfc?: string | null
   uso_cfdi?: string | null
   regimen_fiscal?: string | null
+  descuento?: number
   direcciones: Array<{ etiqueta: string; direccion: string; contactos: Contacto[] }>
   contactos: Contacto[]
 }
@@ -148,6 +149,9 @@ export default function CotizacionModal({
   const [clienteOpen, setClienteOpen] = useState(false)
   const clienteRef = useRef<HTMLDivElement>(null)
 
+  const [clienteDescuento, setClienteDescuento] = useState(clienteInicial?.descuento ?? 0)
+  const [itemDescKey, setItemDescKey] = useState(0)
+
   const [rfc, setRfc] = useState(clienteInicial?.rfc ?? '')
   const [cfdiUso, setCfdiUso] = useState(clienteInicial?.uso_cfdi ?? '')
   const [direccionIdx, setDireccionIdx] = useState(0)
@@ -223,6 +227,17 @@ export default function CotizacionModal({
     setDireccionIdx(0)
     setContactosSeleccionados([])
     setClienteOpen(false)
+    const desc = c.descuento ?? 0
+    setClienteDescuento(desc)
+    // Aplicar descuento del cliente a todos los ítems existentes
+    if (desc !== 0) {
+      setItems(prev => prev.map(item => {
+        const updated = { ...item, descuento: desc }
+        updated.subtotal = calcSubtotal(updated)
+        return updated
+      }))
+    }
+    setItemDescKey(k => k + 1)
   }
 
   function setItem(i: number, field: keyof ItemForm, value: string | number | null) {
@@ -248,6 +263,7 @@ export default function CotizacionModal({
         descripcion: prod.nombre,
         precio_unitario: prod.precio_venta,
         precio_compra: prod.precio_compra_neto,
+        descuento: clienteDescuento, // auto-aplicar descuento del cliente
         producto_id: prod.id,
         imagen_url: prod.imagen_url,
       }
@@ -558,10 +574,27 @@ export default function CotizacionModal({
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:text-gray-400" />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Descuento (%) Item</label>
-                      <input type="number" min="0" max="100" step="0.01" value={item.descuento}
-                        onChange={(e) => setItem(i, 'descuento', parseFloat(e.target.value) || 0)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                        Desc. (%)
+                        {clienteDescuento !== 0 && (
+                          <span className={`ml-1 normal-case font-normal ${clienteDescuento < 0 ? 'text-orange-500' : 'text-blue-500'}`}>
+                            cliente: {clienteDescuento}%
+                          </span>
+                        )}
+                      </label>
+                      <input
+                        type="number"
+                        key={`desc-${i}-${itemDescKey}`}
+                        min="-100"
+                        max="100"
+                        step="0.01"
+                        defaultValue={item.descuento}
+                        onChange={(e) => {
+                          const n = parseFloat(e.target.value)
+                          if (!isNaN(n)) setItem(i, 'descuento', n)
+                        }}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      />
                     </div>
                   </div>
 
