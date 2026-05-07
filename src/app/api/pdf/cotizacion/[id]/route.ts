@@ -34,11 +34,18 @@ export async function GET(
       String(item.imagen_url ?? '').trim() ||
       String(producto?.imagen_url ?? '').trim() ||
       null
+
+    // El precio unitario que ve el cliente ya incluye el descuento/recargo del cliente.
+    // Así el cliente no ve ni el precio base ni el porcentaje de ajuste.
+    const precioBase = Number(item.precio_unitario ?? 0)
+    const desc = Number(item.descuento ?? 0)
+    const precioEfectivo = precioBase * (1 - desc / 100)
+
     return {
       descripcion: String(item.descripcion ?? ''),
       cantidad: Number(item.cantidad ?? 0),
-      precio_unitario: `$${Number(item.precio_unitario ?? 0).toFixed(2)}`,
-      descuento: Number(item.descuento ?? 0),
+      precio_unitario: `$${precioEfectivo.toFixed(2)}`,
+      descuento: 0,
       subtotal: `$${Number(item.subtotal ?? 0).toFixed(2)}`,
       imagen_url: imagenUrl,
     }

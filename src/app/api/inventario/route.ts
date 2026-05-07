@@ -29,9 +29,24 @@ export async function POST(req: NextRequest) {
   const supabase = createServiceClient()
   const body = await req.json()
 
+  // Auto-generar código PROD-XXXX
+  const { data: ultimo } = await supabase
+    .from('productos')
+    .select('codigo')
+    .like('codigo', 'PROD-%')
+    .order('codigo', { ascending: false })
+    .limit(1)
+    .single()
+
+  let codigo = 'PROD-0001'
+  if (ultimo?.codigo) {
+    const num = parseInt((ultimo.codigo as string).replace('PROD-', ''), 10)
+    if (!isNaN(num)) codigo = `PROD-${String(num + 1).padStart(4, '0')}`
+  }
+
   const { data, error } = await supabase
     .from('productos')
-    .insert(body)
+    .insert({ ...body, codigo })
     .select()
     .single()
 
