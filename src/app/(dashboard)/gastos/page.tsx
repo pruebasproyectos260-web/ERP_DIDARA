@@ -1,14 +1,14 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import GastosClient from './GastosClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function GastosPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
 
-  const { data: perfil } = await supabase
+  const { data: perfil } = await authClient
     .from('usuarios')
     .select('nivel, nombre')
     .eq('id', user!.id)
@@ -16,6 +16,7 @@ export default async function GastosPage() {
 
   if (perfil?.nivel === 3) redirect('/clientes')
 
+  const supabase = createServiceClient()
   const [
     { data: gastosFijos },
     { data: gastosVariables },
