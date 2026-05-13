@@ -13,6 +13,7 @@ import {
   Receipt,
   Settings,
   ClipboardList,
+  Monitor,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -35,6 +36,7 @@ const navItems: NavItem[] = [
   { href: '/reportes',     label: 'Reportes',     icon: Wrench,          nivelMinimo: 0 },
   { href: '/agenda',       label: 'Agenda',       icon: Calendar,        nivelMinimo: 0 },
   { href: '/pendientes',   label: 'Pendientes',   icon: ClipboardList,   nivelMinimo: 0 },
+  { href: '/software',     label: 'Software',     icon: Monitor,         nivelMinimo: 0 },
   { href: '/ventas',       label: 'Ventas',       icon: TrendingUp,      nivelMinimo: 0, nivelMaximo: 3 },
   { href: '/gastos',       label: 'Gastos',       icon: Receipt,         nivelMinimo: 0, nivelMaximo: 3 },
   { href: '/admin',        label: 'Admin',        icon: Settings,        nivelMinimo: 0, nivelMaximo: 2 },
