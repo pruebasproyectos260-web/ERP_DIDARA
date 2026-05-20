@@ -120,7 +120,7 @@ function htmlCotizacion(d: DatosCotizacionPDF): string {
   tbody td { border: 1px solid #ddd; padding: 5px 8px; vertical-align: middle; }
   tbody tr:nth-child(even) td { background: #fafafa; }
   .img-cell { text-align: center; width: 75px; }
-  .product-img { width: 65px; height: 65px; object-fit: cover; border-radius: 3px; }
+  .product-img { width: 65px; height: 65px; object-fit: contain; border-radius: 3px; background: #f9f9f9; }
   .no-img {
     width: 65px; height: 65px; background: #eee; border-radius: 3px;
     display: flex; align-items: center; justify-content: center;
