@@ -275,7 +275,7 @@ export async function generarPDFCotizacion(datos: DatosCotizacionPDF): Promise<B
 
   try {
     const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'networkidle0' })
+    await page.setContent(html, { waitUntil: 'networkidle2', timeout: 20000 })
     const footerTemplate = `
       <div style="width:100%;font-family:Arial,sans-serif;font-size:8px;color:#999;
         display:flex;justify-content:space-between;align-items:center;

@@ -17,11 +17,15 @@ export async function enviarCorreo({ para, cc, asunto, html, adjuntos }: Opcione
     throw new Error(`SMTP no configurado: HOST=${host ?? 'falta'} USER=${user ? 'ok' : 'falta'} PASS=${pass ? 'ok' : 'falta'}`)
   }
 
+  const port = parseInt(process.env.SMTP_PORT ?? '465')
   const transporter = nodemailer.createTransport({
     host,
-    port: parseInt(process.env.SMTP_PORT ?? '465'),
-    secure: parseInt(process.env.SMTP_PORT ?? '465') === 465,
+    port,
+    secure: port === 465,
     auth: { user, pass },
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   })
 
   return transporter.sendMail({
