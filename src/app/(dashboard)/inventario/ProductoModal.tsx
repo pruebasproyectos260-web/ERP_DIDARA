@@ -10,6 +10,30 @@ const CATEGORIAS_OPCIONES = [
   'Seguridad', 'Automatización', 'Audio y Video', 'Acceso',
 ]
 
+// Catálogo SAT c_ClaveUnidad (CFDI 4.0)
+const UNIDADES_SAT: Record<string, { clave: string; nombre: string }> = {
+  'pza':        { clave: 'H87', nombre: 'Pieza' },
+  'servicio':   { clave: 'E48', nombre: 'Unidad de Servicio' },
+  'hora':       { clave: 'HUR', nombre: 'Hora' },
+  'día':        { clave: 'DAY', nombre: 'Día' },
+  'mes':        { clave: 'MON', nombre: 'Mes' },
+  'actividad':  { clave: 'ACT', nombre: 'Actividad' },
+  'licencia':   { clave: 'E48', nombre: 'Unidad de Servicio' },
+  'viaje':      { clave: 'E54', nombre: 'Viaje' },
+  'persona':    { clave: 'E55', nombre: 'Persona' },
+  'mt':         { clave: 'MTR', nombre: 'Metro' },
+  'm2':         { clave: 'MTK', nombre: 'Metro cuadrado' },
+  'lt':         { clave: 'LTR', nombre: 'Litro' },
+  'kg':         { clave: 'KGM', nombre: 'Kilogramo' },
+  'g':          { clave: 'GRM', nombre: 'Gramo' },
+  'ton':        { clave: 'A75', nombre: 'Tonelada' },
+  'caja':       { clave: 'XBX', nombre: 'Caja' },
+  'par':        { clave: 'PR',  nombre: 'Par' },
+  'kit':        { clave: 'KT',  nombre: 'Kit' },
+  'set':        { clave: 'SET', nombre: 'Conjunto' },
+  'uno':        { clave: 'C62', nombre: 'Uno' },
+}
+
 interface Props {
   producto: Producto | null
   ivaDefault: number
@@ -52,6 +76,12 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
   const [precioCompraConIva, setPrecioCompraConIva] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Auto-fill clave SAT unidad cuando cambia la unidad
+  useEffect(() => {
+    const sat = UNIDADES_SAT[form.unidad]
+    if (sat) setField('clave_sat_unidad', sat.clave)
+  }, [form.unidad]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const neto = parseFloat(form.precio_venta) || 0
@@ -213,8 +243,8 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
                 onChange={e => setField('unidad', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {['pza', 'servicio', 'hora', 'mt', 'lt', 'kg', 'caja', 'par'].map(u => (
-                  <option key={u} value={u}>{u}</option>
+                {Object.entries(UNIDADES_SAT).map(([val, { nombre, clave }]) => (
+                  <option key={val} value={val}>{val} — {nombre} ({clave})</option>
                 ))}
               </select>
             </div>
@@ -313,7 +343,14 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Clave SAT Unidad</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Clave SAT Unidad
+                {UNIDADES_SAT[form.unidad] && (
+                  <span className="ml-1 text-xs text-blue-500 font-normal">
+                    — {UNIDADES_SAT[form.unidad].nombre}
+                  </span>
+                )}
+              </label>
               <input type="text" value={form.clave_sat_unidad}
                 onChange={e => setField('clave_sat_unidad', e.target.value)}
                 placeholder="ej. H87"

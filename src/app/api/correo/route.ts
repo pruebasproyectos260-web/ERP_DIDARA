@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { enviarCorreo } from '@/lib/correo'
 import { generarPDFCotizacion, type ItemPDF } from '@/lib/pdf-cotizacion'
 import { generarPDFReporte } from '@/lib/pdf-reporte'
@@ -43,9 +43,6 @@ function emailLayout(titulo: string, subtitulo: string, contenido: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const authClient = await createClient()
-  const { data: { user } } = await authClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   const supabase = createServiceClient()
 
   const { destinatarios, mensaje_adicional, cotizacion_id, reporte_id, adjuntar_pdf } = await req.json()
