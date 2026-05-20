@@ -23,9 +23,10 @@ export async function enviarCorreo({ para, cc, asunto, html, adjuntos }: Opcione
     port,
     secure: port === 465,
     auth: { user, pass },
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 20_000,
+    connectionTimeout: 60_000,
+    greetingTimeout: 30_000,
+    socketTimeout: 60_000,
+    tls: { rejectUnauthorized: false },
   })
 
   return transporter.sendMail({
