@@ -79,6 +79,8 @@ export interface Producto {
   categorias?: string          // semicolon-separated: "CCTV;Energía"
   unidad: string
   precio_venta: number
+  precio_venta_incluye_iva: boolean
+  iva_venta: number
   precio_compra_neto: number
   precio_compra_incluye_iva: boolean
   iva_compra: number           // porcentaje, ej: 16

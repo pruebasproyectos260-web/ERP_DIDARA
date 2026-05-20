@@ -26,6 +26,8 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
     descripcion: producto?.descripcion ?? '',
     unidad: producto?.unidad ?? 'pza',
     precio_venta: producto?.precio_venta?.toString() ?? '0',
+    precio_venta_incluye_iva: producto?.precio_venta_incluye_iva ?? false,
+    iva_venta: producto?.iva_venta?.toString() ?? ivaDefault.toString(),
     precio_compra_neto: producto?.precio_compra_neto?.toString() ?? '0',
     precio_compra_incluye_iva: producto?.precio_compra_incluye_iva ?? false,
     iva_compra: producto?.iva_compra?.toString() ?? ivaDefault.toString(),
@@ -46,14 +48,21 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
   const [imagenPreview, setImagenPreview] = useState(producto?.imagen_url ?? '')
   const [subiendoImagen, setSubiendoImagen] = useState(false)
 
-  const [precioConIva, setPrecioConIva] = useState(0)
+  const [precioVentaConIva, setPrecioVentaConIva] = useState(0)
+  const [precioCompraConIva, setPrecioCompraConIva] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    const neto = parseFloat(form.precio_venta) || 0
+    const iva = parseFloat(form.iva_venta) || 0
+    setPrecioVentaConIva(form.precio_venta_incluye_iva ? neto : neto * (1 + iva / 100))
+  }, [form.precio_venta, form.iva_venta, form.precio_venta_incluye_iva])
+
+  useEffect(() => {
     const neto = parseFloat(form.precio_compra_neto) || 0
     const iva = parseFloat(form.iva_compra) || 0
-    setPrecioConIva(form.precio_compra_incluye_iva ? neto : neto * (1 + iva / 100))
+    setPrecioCompraConIva(form.precio_compra_incluye_iva ? neto : neto * (1 + iva / 100))
   }, [form.precio_compra_neto, form.iva_compra, form.precio_compra_incluye_iva])
 
   function setField(field: keyof typeof form, value: string | boolean) {
@@ -112,6 +121,8 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
         categorias: categoriasStr || null,
         unidad: form.unidad,
         precio_venta: parseFloat(form.precio_venta) || 0,
+        precio_venta_incluye_iva: form.precio_venta_incluye_iva,
+        iva_venta: parseFloat(form.iva_venta) || 0,
         precio_compra_neto: parseFloat(form.precio_compra_neto) || 0,
         precio_compra_incluye_iva: form.precio_compra_incluye_iva,
         iva_compra: parseFloat(form.iva_compra) || 0,
@@ -219,16 +230,46 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
           </div>
 
           {/* Precios */}
-          <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+          <div className="border border-gray-200 rounded-xl p-4 space-y-4">
             <h3 className="text-sm font-medium text-gray-700">Precios</h3>
-            <div className="grid grid-cols-2 gap-4">
+
+            {/* Precio de venta */}
+            <div className="space-y-2">
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Precio venta (sin IVA)</label>
+                <label className="block text-xs text-gray-600 mb-1">Precio venta</label>
                 <input type="number" min="0" step="0.01" value={form.precio_venta}
                   onChange={e => setField('precio_venta', e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.precio_venta_incluye_iva}
+                  onChange={e => setField('precio_venta_incluye_iva', e.target.checked)}
+                  className="rounded border-gray-300 text-green-600"
+                />
+                <span className="text-xs text-gray-700">El precio de venta ya incluye IVA</span>
+              </label>
+              {!form.precio_venta_incluye_iva && (
+                <div className="grid grid-cols-2 gap-3 items-center">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">IVA venta (%)</label>
+                    <input type="number" min="0" max="100" step="0.01" value={form.iva_venta}
+                      onChange={e => setField('iva_venta', e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <div className="bg-green-50 rounded-lg px-3 py-2">
+                    <p className="text-xs text-green-600 font-medium">Precio c/IVA</p>
+                    <p className="text-sm font-bold text-green-800">${precioVentaConIva.toFixed(2)}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-100" />
+
+            {/* Precio de compra */}
+            <div className="space-y-2">
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Precio compra</label>
                 <input type="number" min="0" step="0.01" value={form.precio_compra_neto}
@@ -236,29 +277,29 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.precio_compra_incluye_iva}
+                  onChange={e => setField('precio_compra_incluye_iva', e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600"
+                />
+                <span className="text-xs text-gray-700">El precio de compra ya incluye IVA</span>
+              </label>
+              {!form.precio_compra_incluye_iva && (
+                <div className="grid grid-cols-2 gap-3 items-center">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">IVA compra (%)</label>
+                    <input type="number" min="0" max="100" step="0.01" value={form.iva_compra}
+                      onChange={e => setField('iva_compra', e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="bg-blue-50 rounded-lg px-3 py-2">
+                    <p className="text-xs text-blue-600 font-medium">Precio c/IVA</p>
+                    <p className="text-sm font-bold text-blue-800">${precioCompraConIva.toFixed(2)}</p>
+                  </div>
+                </div>
+              )}
             </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={form.precio_compra_incluye_iva}
-                onChange={e => setField('precio_compra_incluye_iva', e.target.checked)}
-                className="rounded border-gray-300 text-blue-600"
-              />
-              <span className="text-sm text-gray-700">El precio de compra ya incluye IVA</span>
-            </label>
-            {!form.precio_compra_incluye_iva && (
-              <div className="grid grid-cols-2 gap-4 items-center">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">IVA compra (%)</label>
-                  <input type="number" min="0" max="100" step="0.01" value={form.iva_compra}
-                    onChange={e => setField('iva_compra', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="bg-blue-50 rounded-lg px-3 py-2">
-                  <p className="text-xs text-blue-600 font-medium">Precio c/IVA</p>
-                  <p className="text-sm font-bold text-blue-800">${precioConIva.toFixed(2)}</p>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* SAT */}
