@@ -1,20 +1,23 @@
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import VentasClient from './VentasClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function VentasPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
 
-  const { data: perfil } = await supabase
+  const { data: perfil } = await authClient
     .from('usuarios')
     .select('nivel, nombre')
     .eq('id', user!.id)
     .single()
 
   if (perfil?.nivel === 3) redirect('/clientes')
+
+  const supabase = createServiceClient()
 
   const [
     { data: cotizaciones },

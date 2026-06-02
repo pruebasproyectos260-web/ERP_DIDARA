@@ -73,6 +73,7 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
     setModal({ open: false, producto: null })
   }
 
+  const puedeAgregar    = nivel <= 2
   const puedeEditar     = nivel <= 1
   const puedeEliminar   = nivel <= 1
   const puedeVerPrecios = nivel <= 1
@@ -85,7 +86,7 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
           <h1 className="text-2xl font-bold text-gray-900">Inventario</h1>
           <p className="text-sm text-gray-500 mt-0.5">{filtrados.length} producto(s)</p>
         </div>
-        {puedeEditar && (
+        {puedeAgregar && (
           <button
             onClick={() => setModal({ open: true, producto: null })}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
