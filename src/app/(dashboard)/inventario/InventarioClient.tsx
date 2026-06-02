@@ -74,7 +74,7 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
   }
 
   const puedeAgregar    = nivel <= 2
-  const puedeEditar     = nivel <= 1
+  const puedeEditar     = nivel <= 2
   const puedeEliminar   = nivel <= 1
   const puedeVerPrecios = nivel <= 1
 
