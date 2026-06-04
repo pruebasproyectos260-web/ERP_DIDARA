@@ -284,8 +284,6 @@ export default function CotizacionModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!clienteSeleccionado) return setError('Selecciona un cliente')
-    if (items.some((it) => !it.descripcion.trim())) return setError('Todos los items deben tener descripción')
-
     setLoading(true)
     setError('')
 

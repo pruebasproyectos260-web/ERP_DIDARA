@@ -23,7 +23,7 @@ const btnSecondary = 'px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-
 const emptyForm = { nombre: '', enlace: '', descripcion: '' }
 
 export default function SoftwareClient({ softwareInit, nivel }: Props) {
-  const esAdmin = nivel <= 1
+  const esAdmin = nivel <= 2
 
   const [lista, setLista] = useState<Software[]>(softwareInit)
   const [busqueda, setBusqueda] = useState('')
