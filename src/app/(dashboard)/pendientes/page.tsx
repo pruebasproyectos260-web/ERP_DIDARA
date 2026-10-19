@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { Plus, Pencil, Trash2, X, Check, AlertTriangle } from 'lucide-react'
 import type { Pendiente, Cliente, Usuario } from '@/types'
 import { borrar } from '@/lib/api-cliente'
+import { aviso, confirmar } from '@/components/ui/Avisos'
 
 const ESTADOS: Pendiente['estado'][] = ['Pendiente', 'Completado']
 
@@ -173,6 +174,7 @@ export default function PendientesPage() {
         setPendientes(prev => [json.data, ...prev])
       }
       setModal(false)
+      aviso.exito(editando ? 'Pendiente actualizado' : 'Pendiente creado')
     } catch {
       setError('Error de red. Intenta de nuevo.')
     } finally {
@@ -181,7 +183,7 @@ export default function PendientesPage() {
   }
 
   async function eliminar(id: number) {
-    if (!confirm('¿Eliminar este pendiente?')) return
+    if (!(await confirmar({ titulo: '¿Eliminar este pendiente?', mensaje: 'Esta acción no se puede deshacer.', peligro: true }))) return
     if (!(await borrar(`/api/pendientes/${id}`, 'No se pudo eliminar el pendiente'))) return
     setPendientes(prev => prev.filter(p => p.id !== id))
   }
@@ -216,7 +218,7 @@ export default function PendientesPage() {
         </div>
         <button
           onClick={abrirNuevo}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           <Plus size={16} /> Nuevo pendiente
         </button>
@@ -231,8 +233,8 @@ export default function PendientesPage() {
             onClick={() => setFiltroEstado(e)}
             className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${
               filtroEstado === e
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                ? 'bg-brand-600 text-white border-brand-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:border-brand-400'
             }`}
           >
             {e || 'Todos'}
@@ -288,7 +290,7 @@ export default function PendientesPage() {
                       ) : (
                         <div className="flex flex-wrap gap-1">
                           {p.tecnico_ids.map(id => (
-                            <span key={id} className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
+                            <span key={id} className="text-[10px] bg-brand-50 text-brand-700 px-1.5 py-0.5 rounded-full font-medium">
                               {techName(id)}
                             </span>
                           ))}
@@ -316,7 +318,7 @@ export default function PendientesPage() {
                       <div className="flex items-center gap-1 justify-end">
                         <button
                           onClick={() => abrirEditar(p)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
                         >
                           <Pencil size={13} />
                         </button>
@@ -355,7 +357,7 @@ export default function PendientesPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
                 <div ref={clienteRef} className="relative">
-                  <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500">
+                  <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-brand-500">
                     <input
                       type="text"
                       value={clienteBusqueda}
@@ -394,8 +396,8 @@ export default function PendientesPage() {
                           <button
                             type="button"
                             onClick={() => seleccionarCliente(c)}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 ${
-                              form.cliente_id === c.id.toString() ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-brand-50 hover:text-brand-700 ${
+                              form.cliente_id === c.id.toString() ? 'bg-brand-50 text-brand-700 font-medium' : 'text-gray-700'
                             }`}
                           >
                             {c.nombre}
@@ -417,7 +419,7 @@ export default function PendientesPage() {
                   <select
                     value={form.contacto_nombre}
                     onChange={e => setForm(f => ({ ...f, contacto_nombre: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                   >
                     <option value="">Sin contacto</option>
                     {contactosCliente.map((c, i) => (
@@ -430,7 +432,7 @@ export default function PendientesPage() {
                     value={form.contacto_nombre}
                     onChange={e => setForm(f => ({ ...f, contacto_nombre: e.target.value }))}
                     placeholder="Nombre del contacto"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 )}
               </div>
@@ -445,7 +447,7 @@ export default function PendientesPage() {
                         type="checkbox"
                         checked={form.tecnico_ids.includes(u.id)}
                         onChange={() => toggleTecnico(u.id)}
-                        className="rounded border-gray-300 text-blue-600"
+                        className="rounded border-gray-300 text-brand-600"
                       />
                       {u.nombre}
                     </label>
@@ -462,7 +464,7 @@ export default function PendientesPage() {
                   value={form.descripcion}
                   onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
                   rows={3}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
                 />
               </div>
 
@@ -476,7 +478,7 @@ export default function PendientesPage() {
                     type="date"
                     value={form.fecha_solicitud}
                     onChange={e => setForm(f => ({ ...f, fecha_solicitud: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
                 <div>
@@ -485,7 +487,7 @@ export default function PendientesPage() {
                     type="date"
                     value={form.fecha_max_entrega}
                     onChange={e => setForm(f => ({ ...f, fecha_max_entrega: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
               </div>
@@ -496,7 +498,7 @@ export default function PendientesPage() {
                 <select
                   value={form.estado}
                   onChange={e => setForm(f => ({ ...f, estado: e.target.value as Pendiente['estado'] }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   {ESTADOS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
@@ -519,7 +521,7 @@ export default function PendientesPage() {
               <button
                 onClick={guardar}
                 disabled={guardando}
-                className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 rounded-lg transition-colors"
               >
                 <Check size={14} />
                 {guardando ? 'Guardando...' : 'Guardar'}

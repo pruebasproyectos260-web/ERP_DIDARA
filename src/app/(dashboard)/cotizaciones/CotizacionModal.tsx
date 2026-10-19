@@ -97,7 +97,7 @@ function ProductSearch({
           onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
           placeholder="Buscar producto..."
-          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
         />
       </div>
       {open && filtered.length > 0 && (
@@ -107,7 +107,7 @@ function ProductSearch({
               key={p.id}
               type="button"
               onMouseDown={() => { onSelect(p); setQuery(p.nombre); setOpen(false) }}
-              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-blue-50 text-left transition-colors border-b border-gray-50 last:border-0"
+              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-brand-50 text-left transition-colors border-b border-gray-50 last:border-0"
             >
               {p.imagen_url ? (
                 <img
@@ -344,12 +344,12 @@ export default function CotizacionModal({
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Fecha</label>
               <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Estado</label>
               <select value={estado} onChange={(e) => setEstado(e.target.value as EstadoCotizacion)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
                 {ESTADOS.map((e) => <option key={e} value={e}>{e.charAt(0).toUpperCase() + e.slice(1)}</option>)}
               </select>
             </div>
@@ -368,13 +368,13 @@ export default function CotizacionModal({
                 onChange={(e) => { setClienteQuery(e.target.value); setClienteOpen(true) }}
                 onFocus={() => setClienteOpen(true)}
                 placeholder="Busca un cliente..."
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
               {clienteOpen && clientesFiltrados.length > 0 && (
                 <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
                   {clientesFiltrados.map((c) => (
                     <button key={c.id} type="button" onMouseDown={() => handleSelectCliente(c)}
-                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0">
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-brand-50 transition-colors border-b border-gray-50 last:border-0">
                       <span className="font-medium">{c.nombre}</span>
                       {c.rfc && <span className="text-xs text-gray-400 ml-2 font-mono">{c.rfc}</span>}
                     </button>
@@ -413,7 +413,7 @@ export default function CotizacionModal({
                     {todasDirecciones.map((dir, idx) => (
                       <label key={idx}
                         className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                          direccionIdx === idx ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200 hover:bg-gray-50'
+                          direccionIdx === idx ? 'bg-brand-50 border-brand-300' : 'bg-white border-gray-200 hover:bg-gray-50'
                         }`}>
                         <input type="radio" name="dir_entrega" checked={direccionIdx === idx}
                           onChange={() => setDireccionIdx(idx)} className="mt-0.5 shrink-0" />
@@ -440,7 +440,7 @@ export default function CotizacionModal({
                       return (
                         <label key={idx}
                           className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
-                            checked ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200 hover:bg-gray-50'
+                            checked ? 'bg-brand-50 border-brand-300' : 'bg-white border-gray-200 hover:bg-gray-50'
                           }`}>
                           <input type="checkbox" checked={checked} onChange={() => toggleContacto(c)} className="shrink-0" />
                           <span className="text-xs text-gray-700">
@@ -462,14 +462,14 @@ export default function CotizacionModal({
           <div className="flex items-center gap-4 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={aplicaIva} onChange={(e) => setAplicaIva(e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 w-4 h-4" />
+                className="rounded border-gray-300 text-brand-600 w-4 h-4" />
               <span className="text-sm font-medium text-gray-700">Aplicar IVA (para facturación)</span>
             </label>
             {aplicaIva && (
               <div className="flex items-center gap-2">
                 <input type="number" min="0" max="100" step="0.01" value={ivaPorcentaje}
                   onChange={(e) => setIvaPorcentaje(parseFloat(e.target.value) || 0)}
-                  className="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
                 <span className="text-sm text-gray-600">%</span>
               </div>
             )}
@@ -488,7 +488,7 @@ export default function CotizacionModal({
                   }`}>
                   {/* Item header */}
                   <div className="flex items-center justify-between mb-3">
-                    <h5 className="text-xs font-bold text-blue-600 uppercase tracking-wider">Item #{i + 1}</h5>
+                    <h5 className="text-xs font-bold text-brand-600 uppercase tracking-wider">Item #{i + 1}</h5>
                     {items.length > 1 && (
                       <button type="button" onClick={() => setItems((prev) => prev.filter((_, j) => j !== i))}
                         className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-semibold bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg transition-colors border border-red-200">
@@ -501,7 +501,7 @@ export default function CotizacionModal({
                   <div className="mb-3">
                     <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Tipo</label>
                     <select value={item.tipo} onChange={(e) => setItem(i, 'tipo', e.target.value)}
-                      className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                      className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
                       <option value="producto">Producto</option>
                       <option value="servicio">Servicio</option>
                       <option value="equipo_recuperado">Equipo Recuperado</option>
@@ -529,7 +529,7 @@ export default function CotizacionModal({
                       <input type="text" value={item.descripcion}
                         onChange={(e) => setItem(i, 'descripcion', e.target.value)}
                         placeholder="Describe el servicio..."
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white" />
                     ) : (
                       <ProductSearch
                         key={`${i}-${item.producto_id ?? 'none'}`}
@@ -545,7 +545,7 @@ export default function CotizacionModal({
                     <div className="mb-3">
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Descripción</label>
                       <textarea value={item.descripcion} onChange={(e) => setItem(i, 'descripcion', e.target.value)}
-                        rows={2} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white resize-none" />
+                        rows={2} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white resize-none" />
                     </div>
                   )}
 
@@ -555,13 +555,13 @@ export default function CotizacionModal({
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Cantidad</label>
                       <input type="number" min="1" step="1" value={item.cantidad}
                         onChange={(e) => setItem(i, 'cantidad', Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white" />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Precio Unitario</label>
                       <input type="number" min="0" step="0.01" value={item.precio_unitario}
                         onChange={(e) => setItem(i, 'precio_unitario', parseFloat(e.target.value) || 0)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white" />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">P. Compra</label>
@@ -569,13 +569,13 @@ export default function CotizacionModal({
                         value={item.tipo === 'servicio' ? 0 : item.precio_compra}
                         onChange={(e) => setItem(i, 'precio_compra', parseFloat(e.target.value) || 0)}
                         disabled={item.tipo === 'servicio'}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:text-gray-400" />
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white disabled:bg-gray-100 disabled:text-gray-400" />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                         Desc. (%)
                         {clienteDescuento !== 0 && (
-                          <span className={`ml-1 normal-case font-normal ${clienteDescuento < 0 ? 'text-orange-500' : 'text-blue-500'}`}>
+                          <span className={`ml-1 normal-case font-normal ${clienteDescuento < 0 ? 'text-orange-500' : 'text-brand-500'}`}>
                             cliente: {clienteDescuento}%
                           </span>
                         )}
@@ -591,7 +591,7 @@ export default function CotizacionModal({
                           const n = parseFloat(e.target.value)
                           if (!isNaN(n)) setItem(i, 'descuento', n)
                         }}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
                       />
                     </div>
                   </div>
@@ -662,7 +662,7 @@ export default function CotizacionModal({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
             <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={3}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none" />
           </div>
 
           {error && (
@@ -677,7 +677,7 @@ export default function CotizacionModal({
             Cancelar
           </button>
           <button onClick={handleSubmit as never} disabled={loading}
-            className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-lg transition-colors">
+            className="px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 rounded-lg transition-colors">
             {loading ? 'Guardando...' : 'Guardar'}
           </button>
         </div>

@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, X } from 'lucide-react'
 import type { GastoFijo, GastoVariable } from '@/types'
 import { borrar } from '@/lib/api-cliente'
+import { aviso, confirmar } from '@/components/ui/Avisos'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
@@ -20,8 +21,8 @@ interface Props {
   usuarioNombre: string
 }
 
-const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
-const btnPrimary = 'px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors'
+const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500'
+const btnPrimary = 'px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors'
 const btnSecondary = 'px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors'
 
 export default function GastosClient({ gastosFijosInit, gastosVariablesInit, nivel, usuarioNombre }: Props) {
@@ -101,10 +102,11 @@ export default function GastosClient({ gastosFijosInit, gastosVariablesInit, niv
     if (editFijo) setFijos((p) => p.map((g) => g.id === editFijo.id ? json.data : g))
     else setFijos((p) => [json.data, ...p])
     setModalFijo(false); setEditFijo(null)
+    aviso.exito(editFijo ? 'Gasto fijo actualizado' : 'Gasto fijo agregado')
   }
 
   async function eliminarFijo(id: number) {
-    if (!confirm('¿Eliminar este gasto fijo?')) return
+    if (!(await confirmar({ titulo: '¿Eliminar este gasto fijo?', mensaje: 'Esta acción no se puede deshacer.', peligro: true }))) return
     if (!(await borrar(`/api/gastos-fijos/${id}`, 'No se pudo eliminar el gasto fijo'))) return
     setFijos((p) => p.filter((g) => g.id !== id))
   }
@@ -131,10 +133,11 @@ export default function GastosClient({ gastosFijosInit, gastosVariablesInit, niv
     if (editVar) setVariables((p) => p.map((g) => g.id === editVar.id ? json.data : g))
     else setVariables((p) => [json.data, ...p])
     setModalVar(false); setEditVar(null)
+    aviso.exito(editVar ? 'Gasto actualizado' : 'Gasto registrado')
   }
 
   async function eliminarVar(id: number) {
-    if (!confirm('¿Eliminar este gasto?')) return
+    if (!(await confirmar({ titulo: '¿Eliminar este gasto?', mensaje: 'Esta acción no se puede deshacer.', peligro: true }))) return
     if (!(await borrar(`/api/gastos-variables/${id}`, 'No se pudo eliminar el gasto'))) return
     setVariables((p) => p.filter((g) => g.id !== id))
   }
@@ -204,7 +207,7 @@ export default function GastosClient({ gastosFijosInit, gastosVariablesInit, niv
                       <td className="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{g.notas ?? '—'}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          <button onClick={() => abrirEditarFijo(g)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Pencil size={13} /></button>
+                          <button onClick={() => abrirEditarFijo(g)} className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg"><Pencil size={13} /></button>
                           {puedeEliminar && <button onClick={() => eliminarFijo(g.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={13} /></button>}
                         </div>
                       </td>
@@ -293,7 +296,7 @@ export default function GastosClient({ gastosFijosInit, gastosVariablesInit, niv
                               <td className="px-4 py-2.5 text-gray-400 text-xs hidden md:table-cell">{g.registrado_por ?? '—'}</td>
                               <td className="px-4 py-2.5">
                                 <div className="flex items-center gap-1">
-                                  <button onClick={() => abrirEditarVar(g)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Pencil size={13} /></button>
+                                  <button onClick={() => abrirEditarVar(g)} className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg"><Pencil size={13} /></button>
                                   {puedeEliminar && <button onClick={() => eliminarVar(g.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={13} /></button>}
                                 </div>
                               </td>

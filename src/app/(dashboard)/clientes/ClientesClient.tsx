@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Plus, Search, Pencil, Trash2, ChevronDown, ChevronRight, ArrowUpDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, ArrowUpDown, Users, Phone, Mail, MapPin } from 'lucide-react'
 import type { Cliente } from '@/types'
 import { borrar } from '@/lib/api-cliente'
 import ClienteModal from './ClienteModal'
+import { aviso, confirmar } from '@/components/ui/Avisos'
+import { BotonIcono, BotonPrincipal, Buscador, EncabezadoPagina, EstadoVacio, Segmentado } from '@/components/ui/Pagina'
 
 type Orden = 'id_asc' | 'id_desc' | 'nombre_az' | 'poliza'
 
@@ -39,7 +41,7 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
   }, [clientes, busqueda, orden])
 
   async function eliminar(id: number) {
-    if (!confirm('¿Eliminar este cliente?')) return
+    if (!(await confirmar({ titulo: '¿Eliminar este cliente?', mensaje: 'Esta acción no se puede deshacer.', peligro: true }))) return
     if (!(await borrar(`/api/clientes/${id}`, 'No se pudo eliminar el cliente'))) return
     setClientes((prev) => prev.filter((c) => c.id !== id))
   }
@@ -47,7 +49,8 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
   function toggleExpand(key: string) {
     setExpandidos((prev) => {
       const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }
@@ -59,6 +62,7 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
       return [cliente, ...prev]
     })
     setModal({ open: false, cliente: null })
+    aviso.exito(`Cliente ${cliente.nombre} guardado`)
   }
 
   const puedeEditar    = nivel <= 2
@@ -75,55 +79,43 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
   ]
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{filtrados.length} cliente(s)</p>
-        </div>
-        {puedeEditar && (
-          <button
-            onClick={() => setModal({ open: true, cliente: null })}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            <Plus size={16} /> Nuevo cliente
-          </button>
+    <div className="space-y-5">
+      <EncabezadoPagina
+        titulo="Clientes"
+        subtitulo={`${filtrados.length} de ${clientes.length} cliente${clientes.length === 1 ? '' : 's'}`}
+        acciones={puedeEditar && (
+          <BotonPrincipal onClick={() => setModal({ open: true, cliente: null })}>
+            <Plus size={17} /> <span>Nuevo cliente</span>
+          </BotonPrincipal>
         )}
-      </div>
+      />
 
       {/* Búsqueda + Orden */}
-      <div className="flex gap-3">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar por ID, nombre, RFC o correo..."
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-lg px-2 py-1">
-          <ArrowUpDown size={13} className="text-gray-400 shrink-0 mr-0.5" />
-          {ordenOpciones.map((op) => (
-            <button
-              key={op.value}
-              onClick={() => setOrden(op.value)}
-              className={`text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap ${
-                orden === op.value ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-100'
-              }`}
-            >
-              {op.label}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center">
+        <Buscador valor={busqueda} onCambio={setBusqueda} placeholder="Buscar por ID, nombre, RFC o correo…" className="flex-1" />
+        <Segmentado opciones={ordenOpciones} valor={orden} onCambio={setOrden} etiqueta={<ArrowUpDown size={13} />} />
       </div>
 
-      {/* Tabla */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {filtrados.length === 0 && (
+        <div className="rounded-2xl border border-gray-200 bg-white">
+          <EstadoVacio icono={<Users size={22} />} titulo="No se encontraron clientes"
+            descripcion={busqueda ? `Ningún cliente coincide con “${busqueda}”.` : 'Aún no hay clientes registrados.'} />
+        </div>
+      )}
+
+      {/* Celular y tableta: tarjetas */}
+      <div className="space-y-3 lg:hidden">
+        {filtrados.map((cliente) => (
+          <TarjetaCliente key={cliente.id} cliente={cliente} verDescuento={verDescuento} verFiscal={verFiscal}
+            puedeEditar={puedeEditar} puedeEliminar={puedeEliminar}
+            onEditar={() => setModal({ open: true, cliente })} onEliminar={() => eliminar(cliente.id)} />
+        ))}
+      </div>
+
+      {/* Escritorio: tabla */}
+      <div className={`hidden overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm shadow-black/[0.02] ${filtrados.length ? 'lg:block' : ''}`}>
         {/* Encabezado */}
-        <div className="grid bg-gray-50 border-b border-gray-200 px-3 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide" style={{ gridTemplateColumns: gridTemplate }}>
+        <div className="grid border-b border-gray-200 bg-gray-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500" style={{ gridTemplateColumns: gridTemplate }}>
           <div>ID</div>
           <div>Nombre / Razón social</div>
           {verDescuento && <div className="text-center">Desc.</div>}
@@ -132,10 +124,6 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
           <div>Direcciones y contactos</div>
           <div className="text-right">Acc.</div>
         </div>
-
-        {filtrados.length === 0 && (
-          <div className="py-16 text-center text-gray-400 text-sm">No se encontraron clientes</div>
-        )}
 
         <div className="divide-y divide-gray-100">
           {filtrados.map((cliente) => {
@@ -148,10 +136,10 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
             const contactosGral = cliente.contactos?.filter(c => c.nombre || c.email) ?? []
 
             return (
-              <div key={cliente.id} className="grid items-start px-3 py-3 hover:bg-gray-50 transition-colors" style={{ gridTemplateColumns: gridTemplate }}>
+              <div key={cliente.id} className="grid items-start px-4 py-3.5 transition-colors hover:bg-gray-50" style={{ gridTemplateColumns: gridTemplate }}>
 
                 {/* ID */}
-                <div className="text-sm font-bold text-blue-600 pt-0.5">#{cliente.id}</div>
+                <div className="pt-0.5 font-mono text-xs font-semibold text-brand-700">#{cliente.id}</div>
 
                 {/* Nombre */}
                 <div className="min-w-0 pt-0.5 pr-2">
@@ -174,7 +162,7 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
                   <div className="text-center pt-0.5">
                     {cliente.descuento !== 0 ? (
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                        cliente.descuento > 0 ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'
+                        cliente.descuento > 0 ? 'bg-brand-50 text-brand-700' : 'bg-orange-50 text-orange-700'
                       }`}>
                         {cliente.descuento > 0 ? '+' : ''}{cliente.descuento}%
                       </span>
@@ -223,14 +211,14 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
                       <div key={i}>
                         <button
                           onClick={() => toggleExpand(key)}
-                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 w-full text-left font-medium"
+                          className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-800 w-full text-left font-medium"
                         >
                           {expandido ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                           {d.etiqueta || `Dir. ${i + 1}`}
                         </button>
 
                         {expandido && (
-                          <div className="mt-1 ml-3 pl-2 border-l-2 border-blue-200 space-y-1.5">
+                          <div className="mt-1 ml-3 pl-2 border-l-2 border-brand-200 space-y-1.5">
                             {d.direccion && (
                               <p className="text-xs text-gray-600 leading-snug">{d.direccion}</p>
                             )}
@@ -258,18 +246,16 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
                 </div>
 
                 {/* Acciones */}
-                <div className="flex items-center gap-1 justify-end pt-0.5">
+                <div className="-mt-1 flex items-center justify-end gap-0.5">
                   {puedeEditar && (
-                    <button onClick={() => setModal({ open: true, cliente })}
-                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                      <Pencil size={14} />
-                    </button>
+                    <BotonIcono titulo="Editar" tono="marca" onClick={() => setModal({ open: true, cliente })}>
+                      <Pencil size={15} />
+                    </BotonIcono>
                   )}
                   {puedeEliminar && (
-                    <button onClick={() => eliminar(cliente.id)}
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
-                      <Trash2 size={14} />
-                    </button>
+                    <BotonIcono titulo="Eliminar" tono="peligro" onClick={() => eliminar(cliente.id)}>
+                      <Trash2 size={15} />
+                    </BotonIcono>
                   )}
                 </div>
               </div>
@@ -286,5 +272,109 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
         />
       )}
     </div>
+  )
+}
+
+// ── Tarjeta para celular ──────────────────────────────────────────────────
+
+function TarjetaCliente({ cliente, verDescuento, verFiscal, puedeEditar, puedeEliminar, onEditar, onEliminar }: {
+  cliente: Cliente
+  verDescuento: boolean
+  verFiscal: boolean
+  puedeEditar: boolean
+  puedeEliminar: boolean
+  onEditar: () => void
+  onEliminar: () => void
+}) {
+  const dirs = cliente.direcciones?.length > 0
+    ? cliente.direcciones
+    : cliente.direccion ? [{ etiqueta: 'Principal', direccion: cliente.direccion, contactos: [] }] : []
+
+  // Contactos generales + los de cada dirección, sin repetir
+  const vistos = new Set<string>()
+  const contactos = [...(cliente.contactos ?? []), ...dirs.flatMap((d) => d.contactos ?? [])]
+    .filter((c) => c.nombre || c.email || c.telefono)
+    .filter((c) => {
+      const clave = `${c.nombre ?? ''}|${c.email ?? ''}|${c.telefono ?? ''}`
+      if (vistos.has(clave)) return false
+      vistos.add(clave)
+      return true
+    })
+
+  return (
+    <article className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm shadow-black/[0.02]">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="font-mono text-xs font-semibold text-brand-700">#{cliente.id}</span>
+            {cliente.tiene_poliza && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700">Póliza</span>}
+            {verDescuento && cliente.descuento !== 0 && (
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${cliente.descuento > 0 ? 'bg-brand-50 text-brand-700' : 'bg-orange-50 text-orange-700'}`}>
+                {cliente.descuento > 0 ? '+' : ''}{cliente.descuento}%
+              </span>
+            )}
+          </div>
+          <h3 className="mt-1 font-semibold leading-snug text-gray-900">{cliente.nombre}</h3>
+          {cliente.rfc && <p className="mt-0.5 font-mono text-xs text-gray-500">RFC {cliente.rfc}</p>}
+          {verFiscal && (cliente.regimen_fiscal || cliente.uso_cfdi) && (
+            <p className="mt-0.5 text-xs text-gray-500">
+              {cliente.regimen_fiscal && <>Régimen {cliente.regimen_fiscal}</>}
+              {cliente.regimen_fiscal && cliente.uso_cfdi && ' · '}
+              {cliente.uso_cfdi && <>CFDI {cliente.uso_cfdi}</>}
+            </p>
+          )}
+        </div>
+        {(puedeEditar || puedeEliminar) && (
+          <div className="-mr-2 -mt-1 flex shrink-0">
+            {puedeEditar && <BotonIcono titulo="Editar" tono="marca" onClick={onEditar}><Pencil size={16} /></BotonIcono>}
+            {puedeEliminar && <BotonIcono titulo="Eliminar" tono="peligro" onClick={onEliminar}><Trash2 size={16} /></BotonIcono>}
+          </div>
+        )}
+      </div>
+
+      {contactos.length > 0 && (
+        <ul className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+          {contactos.slice(0, 3).map((c, i) => (
+            <li key={i} className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm text-gray-800">
+                  {c.nombre || c.email}
+                  {c.es_fiscal && <span className="ml-1.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-700">Fiscal</span>}
+                </p>
+                {c.puesto && <p className="truncate text-xs text-gray-400">{c.puesto}</p>}
+              </div>
+              {c.telefono && (
+                <a href={`tel:${c.telefono.replace(/[^\d+]/g, '')}`} aria-label={`Llamar a ${c.nombre || c.telefono}`}
+                  className="rounded-lg bg-brand-50 p-2 text-brand-700 active:bg-brand-100"><Phone size={15} /></a>
+              )}
+              {c.email && (
+                <a href={`mailto:${c.email}`} aria-label={`Escribir a ${c.email}`}
+                  className="rounded-lg bg-brand-50 p-2 text-brand-700 active:bg-brand-100"><Mail size={15} /></a>
+              )}
+            </li>
+          ))}
+          {contactos.length > 3 && <li className="text-xs text-gray-400">+{contactos.length - 3} contacto(s) más</li>}
+        </ul>
+      )}
+
+      {dirs.length > 0 && (
+        <ul className="mt-3 space-y-1.5 border-t border-gray-100 pt-3">
+          {dirs.map((d, i) => d.direccion && (
+            <li key={i}>
+              <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.direccion)}`}
+                target="_blank" rel="noopener noreferrer" className="flex items-start gap-2 text-sm text-gray-600 active:text-brand-700">
+                <MapPin size={15} className="mt-0.5 shrink-0 text-gray-400" />
+                <span className="min-w-0">
+                  {dirs.length > 1 && <span className="font-medium text-gray-800">{d.etiqueta || `Dirección ${i + 1}`}: </span>}
+                  {d.direccion}
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {cliente.notas && <p className="mt-3 text-xs italic text-gray-400">{cliente.notas}</p>}
+    </article>
   )
 }

@@ -1,8 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { TrendingUp, TrendingDown, Users, FileText, Wrench, RefreshCw } from 'lucide-react'
+import {
+  TrendingUp, TrendingDown, Users, FileText, Wrench, RefreshCw, Wallet,
+  ArrowUpRight, ArrowDownRight, PackageX, ChevronRight,
+} from 'lucide-react'
 import {
   Chart as ChartJS,
   ArcElement, Tooltip, Legend,
@@ -10,15 +13,21 @@ import {
   Filler, Title,
 } from 'chart.js'
 import { Doughnut, Line, Bar } from 'react-chartjs-2'
+import { useTemaOscuro } from '@/lib/tema'
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Filler, Title)
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
+const fmtCorto = (n: number) =>
+  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', notation: 'compact', maximumFractionDigits: 1 }).format(n)
 
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const MESES_LARGOS = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+const PAGADAS = ['pagada', 'facturada']
+const CERRADAS = ['pagada', 'facturada', 'cancelada', 'rechazada']
 
 interface DashData {
   cotizaciones: { id: number; fecha: string; estado: string; total: number; ganancia_total?: number; ganancia_real?: number; pct_didara?: number }[]
@@ -48,81 +57,94 @@ function isMesKey(fecha: string, mesKey: string): boolean {
   return (fecha ?? '').slice(0, 7) === mesKey
 }
 
+const claveMes = (anio: number, mes: number) => `${anio}-${String(mes).padStart(2, '0')}`
+
+/** Totales de un mes (mismas reglas que antes; se reutiliza para comparar con el mes anterior) */
+function resumenMes(data: DashData | null, mk: string) {
+  const cots = (data?.cotizaciones ?? []).filter((c) => isMesKey(c.fecha, mk))
+  const reps = (data?.reportes ?? []).filter((r) => isMesKey(r.fecha_ingreso, mk))
+  const mans = (data?.ingresosManuales ?? []).filter((m) => isMesKey(m.fecha, mk))
+  const ganFijas = (data?.gananciasFijas ?? []).filter((g) => !g.fecha_inicio || g.fecha_inicio <= mk)
+  const gastFijos = (data?.gastosFijos ?? []).filter((g) => !g.fecha_inicio || g.fecha_inicio <= mk)
+  const gastVar = (data?.gastosVariables ?? []).filter((v) => isMesKey(v.fecha, mk))
+
+  const ingresos = cots.filter((c) => PAGADAS.includes(c.estado)).reduce((a, c) => a + ganCot(c), 0)
+    + reps.reduce((a, r) => a + (r.total ?? 0), 0)
+    + mans.reduce((a, m) => a + m.monto, 0)
+  const totalGanFijas = ganFijas.reduce((a, g) => a + g.monto, 0)
+  const totalGastosFijos = gastFijos.reduce((a, g) => a + g.monto, 0)
+  const totalGastosVar = gastVar.reduce((a, v) => a + v.monto, 0)
+  const gastos = totalGastosFijos + totalGastosVar
+
+  return {
+    cots, reps, mans, gastVar, ingresos, totalGanFijas, totalGastosFijos, totalGastosVar, gastos,
+    neta: ingresos + totalGanFijas - gastos,
+  }
+}
+
+/** Variación porcentual; null si no hay base para comparar */
+function variacion(actual: number, anterior: number | undefined): number | null {
+  if (anterior === undefined || anterior === 0) return null
+  return ((actual - anterior) / Math.abs(anterior)) * 100
+}
+
 export default function DashboardClient({ nivel, totalClientes, reportesAbiertos, productosBajoStock, totalBajoStock, nombre }: Props) {
   const now = new Date()
   const [mes,  setMes]  = useState(now.getMonth() + 1)
   const [anio, setAnio] = useState(now.getFullYear())
   const [data, setData] = useState<DashData | null>(null)
-  const [loading, setLoading] = useState(false)
-  const loaded = useRef(false)
+  const [loading, setLoading] = useState(true)
+  const [recarga, setRecarga] = useState(0)
+  const oscuro = useTemaOscuro()
+  const esAdmin = nivel <= 1
 
-  async function cargar(m: number, a: number) {
-    setLoading(true)
-    const res = await fetch(`/api/dashboard?mes=${m}&anio=${a}`)
-    const json = await res.json()
-    setData(json.data)
-    setLoading(false)
-  }
-
+  // La API devuelve el año completo: solo se vuelve a pedir al cambiar de año o actualizar
   useEffect(() => {
-    if (!loaded.current) { loaded.current = true; cargar(mes, anio) }
-  }, [])
+    let cancelado = false
+    fetch(`/api/dashboard?mes=${mes}&anio=${anio}`)
+      .then((r) => r.json())
+      .then((json) => { if (!cancelado) setData(json.data) })
+      .catch(() => {})
+      .finally(() => { if (!cancelado) setLoading(false) })
+    return () => { cancelado = true }
+    // mes no va en las dependencias a propósito: cambiarlo no requiere otra consulta
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anio, recarga])
 
-  function cambiarMes(m: number) { setMes(m); cargar(m, anio) }
-  function cambiarAnio(a: number) { setAnio(a); cargar(mes, a) }
+  function cambiarAnio(a: number) { setLoading(true); setAnio(a) }
+  function actualizar() { setLoading(true); setRecarga((n) => n + 1) }
 
   // ── Cálculos ──────────────────────────────────────────────────────────────
-  const mesKey = data?.mesKey ?? `${anio}-${String(mes).padStart(2, '0')}`
+  const mesKey = claveMes(anio, mes)
+  const actual = resumenMes(data, mesKey)
+  const previo = mes > 1 ? resumenMes(data, claveMes(anio, mes - 1)) : undefined
 
-  const cotsMes   = (data?.cotizaciones ?? []).filter((c) => isMesKey(c.fecha, mesKey))
-  const repsMes   = (data?.reportes ?? []).filter((r) => isMesKey(r.fecha_ingreso, mesKey))
-  const mansMes   = (data?.ingresosManuales ?? []).filter((m) => isMesKey(m.fecha, mesKey))
+  const cotsPend = actual.cots.filter((c) => !CERRADAS.includes(c.estado)).length
+  const cotsPag  = actual.cots.filter((c) => PAGADAS.includes(c.estado)).length
+  const cotsCanc = actual.cots.filter((c) => ['cancelada', 'rechazada'].includes(c.estado)).length
 
-  const gananciasFijasActivas = (data?.gananciasFijas ?? []).filter((g) => !g.fecha_inicio || g.fecha_inicio <= mesKey)
-  const gastosFijosActivos    = (data?.gastosFijos ?? []).filter((g) => !g.fecha_inicio || g.fecha_inicio <= mesKey)
-  const gastosVarMes          = (data?.gastosVariables ?? []).filter((v) => isMesKey(v.fecha, mesKey))
-
-  const totalIngresosMes  = cotsMes.filter((c) => ['pagada', 'facturada'].includes(c.estado)).reduce((a, c) => a + ganCot(c), 0)
-    + repsMes.reduce((a, r) => a + (r.total ?? 0), 0)
-    + mansMes.reduce((a, m) => a + m.monto, 0)
-  const totalGanFijasMes  = gananciasFijasActivas.reduce((a, g) => a + g.monto, 0)
-  const totalGastosFijosMes = gastosFijosActivos.reduce((a, g) => a + g.monto, 0)
-  const totalGastosVarMes = gastosVarMes.reduce((a, v) => a + v.monto, 0)
-  const totalGastosMes    = totalGastosFijosMes + totalGastosVarMes
-  const ganNeta           = totalIngresosMes + totalGanFijasMes - totalGastosMes
-
-  // ── Datos gráfica 1: estados de cotizaciones ─────────────────────────────
-  const cotsPend = cotsMes.filter((c) => !['pagada', 'facturada', 'cancelada', 'rechazada'].includes(c.estado)).length
-  const cotsPag  = cotsMes.filter((c) => ['pagada', 'facturada'].includes(c.estado)).length
-  const cotsCanc = cotsMes.filter((c) => ['cancelada', 'rechazada'].includes(c.estado)).length
-
-  // ── Datos gráfica 2: ingresos vs gastos por semana ───────────────────────
+  // Ingresos vs gastos por semana
   const semanas = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5']
-  const ingresosSem  = [0, 0, 0, 0, 0]
-  const gastosSem    = [0, 0, 0, 0, 0]
-
-  const ingresoFijoPorSem = totalGanFijasMes / 4
-  const gastoFijoPorSem   = totalGastosFijosMes / 4
+  const ingresosSem = [0, 0, 0, 0, 0]
+  const gastosSem   = [0, 0, 0, 0, 0]
+  const ingresoFijoPorSem = actual.totalGanFijas / 4
+  const gastoFijoPorSem   = actual.totalGastosFijos / 4
   semanas.forEach((_, i) => { ingresosSem[i] += ingresoFijoPorSem; gastosSem[i] += gastoFijoPorSem })
+  const getDiaSem = (fecha: string) => Math.min(Math.ceil(parseInt(fecha.slice(8, 10)) / 7) - 1, 4)
+  actual.cots.filter((c) => PAGADAS.includes(c.estado)).forEach((c) => { ingresosSem[getDiaSem(c.fecha)] += ganCot(c) })
+  actual.reps.forEach((r) => { ingresosSem[getDiaSem(r.fecha_ingreso)] += r.total ?? 0 })
+  actual.mans.forEach((m) => { ingresosSem[getDiaSem(m.fecha)] += m.monto })
+  actual.gastVar.forEach((v) => { gastosSem[getDiaSem(v.fecha)] += v.monto })
 
-  const getDiaSem = (fecha: string) => {
-    const d = parseInt(fecha.slice(8, 10))
-    return Math.min(Math.ceil(d / 7) - 1, 4)
-  }
-  cotsMes.filter((c) => ['pagada', 'facturada'].includes(c.estado)).forEach((c) => { ingresosSem[getDiaSem(c.fecha)] += ganCot(c) })
-  repsMes.forEach((r) => { ingresosSem[getDiaSem(r.fecha_ingreso)] += r.total ?? 0 })
-  mansMes.forEach((m) => { ingresosSem[getDiaSem(m.fecha)] += m.monto })
-  gastosVarMes.forEach((v) => { gastosSem[getDiaSem(v.fecha)] += v.monto })
-
-  // ── Datos gráfica 3: ganancia neta anual ─────────────────────────────────
+  // Ganancia neta anual
   const ganAnio  = Array(12).fill(0)
   const gastAnio = Array(12).fill(0)
   for (let mi = 0; mi < 12; mi++) {
-    const mk = `${anio}-${String(mi + 1).padStart(2, '0')}`
+    const mk = claveMes(anio, mi + 1)
     ganAnio[mi]  += (data?.gananciasFijas ?? []).filter((g) => !g.fecha_inicio || g.fecha_inicio <= mk).reduce((a, g) => a + g.monto, 0)
     gastAnio[mi] += (data?.gastosFijos ?? []).filter((g) => !g.fecha_inicio || g.fecha_inicio <= mk).reduce((a, g) => a + g.monto, 0)
   }
-  ;(data?.cotizaciones ?? []).filter((c) => ['pagada', 'facturada'].includes(c.estado)).forEach((c) => {
+  ;(data?.cotizaciones ?? []).filter((c) => PAGADAS.includes(c.estado)).forEach((c) => {
     const mi = parseInt(c.fecha.slice(5, 7)) - 1
     if (mi >= 0 && mi < 12) ganAnio[mi] += ganCot(c)
   })
@@ -140,164 +162,242 @@ export default function DashboardClient({ nivel, totalClientes, reportesAbiertos
   })
   const netaAnio = ganAnio.map((g, i) => g - gastAnio[i])
 
-  const chartOpts = {
-    responsive: true,
-    plugins: { legend: { labels: { font: { size: 11 } } } },
+  // ── Estilo de gráficas según el tema ────────────────────────────────────
+  const colorTexto = oscuro ? '#94a3a1' : '#6b7280'
+  const colorRejilla = oscuro ? 'rgba(255,255,255,0.06)' : 'rgba(17,24,39,0.06)'
+  const VERDE = '#16a34a', ROJO = '#dc2626', MARCA = '#187d78', AMBAR = '#eab308'
+  const ejes = {
+    x: { grid: { display: false }, ticks: { color: colorTexto, font: { size: 11 } }, border: { display: false } },
+    y: {
+      grid: { color: colorRejilla }, border: { display: false },
+      ticks: { color: colorTexto, font: { size: 11 }, callback: (v: string | number) => fmtCorto(Number(v)) },
+    },
   }
+  const tooltip = {
+    backgroundColor: oscuro ? '#1a2828' : '#0b2928', padding: 10, cornerRadius: 8,
+    callbacks: { label: (ctx: { dataset: { label?: string }; parsed: { y: number | null } }) => ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y ?? 0)}` },
+  }
+
+  const nombreCorto = nombre.split(' ')[0] || 'bienvenido'
+  const hora = now.getHours()
+  const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
+  const selectCls = 'rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-brand-500/30'
 
   return (
     <div className="space-y-6">
-      {/* Saludo */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Hola, {nombre.split(' ')[0] || 'bienvenido'}</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          {now.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-        </p>
-      </div>
-
-      {/* Selector mes/año + refresh */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <select value={mes} onChange={(e) => cambiarMes(Number(e.target.value))}
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white">
-          {MESES_LARGOS.slice(1).map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
-        </select>
-        <select value={anio} onChange={(e) => cambiarAnio(Number(e.target.value))}
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white">
-          {[now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2].map((a) => <option key={a} value={a}>{a}</option>)}
-        </select>
-        <button onClick={() => cargar(mes, anio)} disabled={loading}
-          className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50 transition-colors">
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          {loading ? 'Cargando…' : 'Actualizar'}
-        </button>
-      </div>
-
-      {/* Tarjetas */}
-      {nivel <= 1 ? (
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <StatCard label={`Cotizaciones ${MESES_CORTOS[mes - 1]}`} value={cotsMes.length.toString()} sub={`${cotsPag} pagadas/facturadas`} color="blue" icon={<FileText size={18} />} />
-          <StatCard label={`Reportes ${MESES_CORTOS[mes - 1]}`} value={repsMes.length.toString()} sub={`${reportesAbiertos} en curso`} color="indigo" icon={<Wrench size={18} />} />
-          <StatCard label={`Ingresos ${MESES_CORTOS[mes - 1]}`} value={fmt(totalIngresosMes)} sub={`+${fmt(totalGanFijasMes)} recurrentes`} color="green" icon={<TrendingUp size={18} />} isCurrency />
-          <StatCard label={`Gastos ${MESES_CORTOS[mes - 1]}`} value={fmt(totalGastosMes)} sub={`Fijos: ${fmt(totalGastosFijosMes)}`} color="red" icon={<TrendingDown size={18} />} isCurrency />
-          <StatCard label="Ganancia neta" value={fmt(ganNeta)} sub="" color={ganNeta >= 0 ? 'emerald' : 'red'} icon={<TrendingUp size={18} />} isCurrency />
+      {/* Saludo + periodo */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight text-gray-900">{saludo}, {nombreCorto}</h2>
+          <p className="mt-1 text-sm text-gray-500 first-letter:uppercase">
+            {now.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
         </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3">
-          <StatCard label={`Cotizaciones ${MESES_CORTOS[mes - 1]}`} value={cotsMes.length.toString()} sub={`${cotsPag} pagadas/facturadas`} color="blue" icon={<FileText size={18} />} />
-          <StatCard label={`Reportes ${MESES_CORTOS[mes - 1]}`} value={repsMes.length.toString()} sub={`${reportesAbiertos} en curso`} color="indigo" icon={<Wrench size={18} />} />
+        <div className="flex items-center gap-2">
+          <select value={mes} onChange={(e) => setMes(Number(e.target.value))} className={selectCls} aria-label="Mes">
+            {MESES_LARGOS.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+          </select>
+          <select value={anio} onChange={(e) => cambiarAnio(Number(e.target.value))} className={selectCls} aria-label="Año">
+            {[now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2].map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+          <button onClick={actualizar} disabled={loading} title="Actualizar"
+            className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2.5 text-[var(--text-muted)] transition-colors hover:text-[var(--text)] disabled:opacity-60">
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+          </button>
         </div>
-      )}
-
-      {/* Tarjeta clientes */}
-      <div className="grid grid-cols-2 gap-3 lg:hidden">
-        <StatCard label="Clientes activos" value={totalClientes.toString()} sub="" color="gray" icon={<Users size={18} />} />
       </div>
-      <div className="hidden lg:block">
-        <StatCard label="Clientes activos" value={totalClientes.toString()} sub="" color="gray" icon={<Users size={18} />} />
+
+      {/* Indicadores */}
+      <div className={`grid grid-cols-2 gap-3 sm:gap-4 ${esAdmin ? 'md:grid-cols-3 xl:grid-cols-6' : 'md:grid-cols-3'}`}>
+        {esAdmin && <>
+          <Indicador etiqueta={`Ingresos ${MESES_CORTOS[mes - 1]}`} valor={fmt(actual.ingresos)} cargando={loading}
+            detalle={`+${fmt(actual.totalGanFijas)} recurrentes`} icono={<TrendingUp size={17} />} tono="verde"
+            cambio={variacion(actual.ingresos, previo?.ingresos)} />
+          <Indicador etiqueta={`Gastos ${MESES_CORTOS[mes - 1]}`} valor={fmt(actual.gastos)} cargando={loading}
+            detalle={`Fijos: ${fmt(actual.totalGastosFijos)}`} icono={<TrendingDown size={17} />} tono="rojo"
+            cambio={variacion(actual.gastos, previo?.gastos)} cambioInvertido />
+          <Indicador etiqueta="Ganancia neta" valor={fmt(actual.neta)} cargando={loading} destacado
+            detalle={actual.neta >= 0 ? 'Resultado positivo' : 'Resultado negativo'} icono={<Wallet size={17} />}
+            tono={actual.neta >= 0 ? 'marca' : 'rojo'} cambio={variacion(actual.neta, previo?.neta)} />
+        </>}
+        <Indicador etiqueta={`Cotizaciones ${MESES_CORTOS[mes - 1]}`} valor={String(actual.cots.length)} cargando={loading}
+          detalle={`${cotsPag} pagadas o facturadas`} icono={<FileText size={17} />} tono="marca"
+          cambio={variacion(actual.cots.length, previo?.cots.length)} href="/cotizaciones" />
+        <Indicador etiqueta={`Reportes ${MESES_CORTOS[mes - 1]}`} valor={String(actual.reps.length)} cargando={loading}
+          detalle={`${reportesAbiertos} en curso`} icono={<Wrench size={17} />} tono="indigo"
+          cambio={variacion(actual.reps.length, previo?.reps.length)} href="/reportes" />
+        <Indicador etiqueta="Clientes activos" valor={String(totalClientes)} detalle="En cartera"
+          icono={<Users size={17} />} tono="gris" href="/clientes" />
       </div>
 
       {/* Gráficas — solo admin */}
-      {nivel <= 1 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Doughnut: estados cotizaciones */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Estados de Cotizaciones — {MESES_LARGOS[mes]} {anio}</h3>
-            {cotsMes.length === 0 ? (
-              <p className="text-center text-gray-400 text-sm py-8">Sin cotizaciones este mes.</p>
-            ) : (
-              <Doughnut
+      {esAdmin && (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <Tarjeta titulo="Ingresos vs gastos" subtitulo={`Por semana · ${MESES_LARGOS[mes]} ${anio}`} className="xl:col-span-2">
+            <div className="h-64 sm:h-72">
+              <Line
                 data={{
-                  labels: ['Pendientes/Enviadas', 'Pagadas/Facturadas', 'Canceladas/Rechazadas'],
-                  datasets: [{ data: [cotsPend, cotsPag, cotsCanc], backgroundColor: ['#EAB308', '#16A34A', '#DC2626'], borderWidth: 1 }],
+                  labels: semanas,
+                  datasets: [
+                    { label: 'Ingresos', data: ingresosSem, borderColor: VERDE, backgroundColor: 'rgba(22,163,74,0.10)', fill: true, tension: 0.35, pointRadius: 3, pointBackgroundColor: VERDE },
+                    { label: 'Gastos', data: gastosSem, borderColor: ROJO, backgroundColor: 'rgba(220,38,38,0.08)', fill: true, tension: 0.35, pointRadius: 3, pointBackgroundColor: ROJO },
+                  ],
                 }}
-                options={{ ...chartOpts, plugins: { ...chartOpts.plugins, legend: { position: 'bottom', labels: { font: { size: 11 } } } } }}
+                options={{
+                  responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                  plugins: { legend: { position: 'top', align: 'end', labels: { color: colorTexto, boxWidth: 10, boxHeight: 10, usePointStyle: true, font: { size: 12 } } }, tooltip },
+                  scales: ejes,
+                }}
               />
+            </div>
+          </Tarjeta>
+
+          <Tarjeta titulo="Estado de cotizaciones" subtitulo={`${MESES_LARGOS[mes]} ${anio}`}>
+            {actual.cots.length === 0 ? (
+              <p className="py-16 text-center text-sm text-gray-400">Sin cotizaciones este mes.</p>
+            ) : (
+              <div className="flex flex-col items-center gap-5">
+                <div className="relative h-44 w-44">
+                  <Doughnut
+                    data={{
+                      labels: ['En proceso', 'Pagadas / facturadas', 'Canceladas / rechazadas'],
+                      datasets: [{ data: [cotsPend, cotsPag, cotsCanc], backgroundColor: [AMBAR, VERDE, ROJO], borderWidth: 0, hoverOffset: 4 }],
+                    }}
+                    options={{ responsive: true, maintainAspectRatio: false, cutout: '72%', plugins: { legend: { display: false }, tooltip: { ...tooltip, callbacks: {} } } }}
+                  />
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-3xl font-semibold text-gray-900">{actual.cots.length}</span>
+                    <span className="text-xs text-gray-500">cotizaciones</span>
+                  </div>
+                </div>
+                <ul className="w-full space-y-2 text-sm">
+                  {[['En proceso', cotsPend, AMBAR], ['Pagadas / facturadas', cotsPag, VERDE], ['Canceladas / rechazadas', cotsCanc, ROJO]].map(([etq, n, color]) => (
+                    <li key={etq as string} className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 text-gray-600">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color as string }} />{etq}
+                      </span>
+                      <span className="font-semibold text-gray-900">{n}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
-          </div>
+          </Tarjeta>
 
-          {/* Line: ingresos vs gastos semanales */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Ingresos vs Gastos — {MESES_LARGOS[mes]} {anio}</h3>
-            <Line
-              data={{
-                labels: semanas,
-                datasets: [
-                  { label: 'Ingresos', data: ingresosSem, borderColor: '#16A34A', backgroundColor: 'rgba(22,163,74,0.1)', fill: true, tension: 0.3 },
-                  { label: 'Gastos',   data: gastosSem,   borderColor: '#DC2626', backgroundColor: 'rgba(220,38,38,0.1)',  fill: true, tension: 0.3 },
-                ],
-              }}
-              options={{ ...chartOpts, scales: { y: { ticks: { callback: (v) => `$${Number(v).toLocaleString()}` } } } }}
-            />
-          </div>
-
-          {/* Bar: ganancia neta anual */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 lg:col-span-2">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Ganancia Neta Mensual — {anio}</h3>
-            <Bar
-              data={{
-                labels: MESES_CORTOS.map((m) => `${m} ${anio}`),
-                datasets: [{
-                  label: 'Ganancia neta',
-                  data: netaAnio,
-                  backgroundColor: netaAnio.map((v) => v >= 0 ? 'rgba(22,163,74,0.7)' : 'rgba(220,38,38,0.7)'),
-                  borderColor: netaAnio.map((v) => v >= 0 ? '#16A34A' : '#DC2626'),
-                  borderWidth: 1,
-                }],
-              }}
-              options={{ ...chartOpts, scales: { y: { ticks: { callback: (v) => `$${Number(v).toLocaleString()}` } } } }}
-            />
-          </div>
+          <Tarjeta titulo="Ganancia neta mensual" subtitulo={`Año ${anio}`} className="xl:col-span-3">
+            <div className="h-64">
+              <Bar
+                data={{
+                  labels: MESES_CORTOS,
+                  datasets: [{
+                    label: 'Ganancia neta',
+                    data: netaAnio,
+                    backgroundColor: netaAnio.map((v, i) => (i === mes - 1 ? (v >= 0 ? MARCA : ROJO) : v >= 0 ? 'rgba(24,125,120,0.35)' : 'rgba(220,38,38,0.35)')),
+                    borderRadius: 6,
+                    maxBarThickness: 42,
+                  }],
+                }}
+                options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip }, scales: ejes }}
+              />
+            </div>
+          </Tarjeta>
         </div>
       )}
 
       {/* Productos bajo stock */}
       {productosBajoStock.length > 0 && (
-        <div className="bg-white rounded-xl border border-orange-200 p-5">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-              <h2 className="font-semibold text-gray-900 text-sm">Productos con bajo stock</h2>
-              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">{totalBajoStock}</span>
-            </div>
-            <Link href="/inventario?bajoStock=1" className="text-xs font-medium text-orange-700 hover:text-orange-900 hover:underline">
-              Ver todos →
-            </Link>
-          </div>
-          <div className="space-y-2">
-            {productosBajoStock.map((p) => (
-              <div key={p.id} className="flex items-center justify-between gap-3 text-sm">
-                <span className="text-gray-700 truncate">{p.nombre}</span>
-                <span className={`font-medium whitespace-nowrap ${Number(p.stock) <= 0 ? 'text-red-600' : 'text-orange-600'}`}>
-                  {Number(p.stock) <= 0 ? 'Agotado' : `${p.stock} ${p.unidad}`} (mín. {p.stock_minimo})
-                </span>
-              </div>
-            ))}
-          </div>
+        <Tarjeta
+          titulo="Productos con bajo stock"
+          subtitulo={`${totalBajoStock} producto${totalBajoStock === 1 ? '' : 's'} en o por debajo de su mínimo`}
+          icono={<PackageX size={17} className="text-orange-600" />}
+          accion={<Link href="/inventario?bajoStock=1" className="flex items-center gap-0.5 text-sm font-medium text-brand-700 hover:underline">Ver todos <ChevronRight size={15} /></Link>}
+        >
+          <ul className="divide-y divide-gray-100">
+            {productosBajoStock.map((p) => {
+              const agotado = Number(p.stock) <= 0
+              const pct = Math.max(0, Math.min(100, (Number(p.stock) / Number(p.stock_minimo)) * 100))
+              return (
+                <li key={p.id} className="flex items-center gap-4 py-2.5">
+                  <span className="min-w-0 flex-1 truncate text-sm text-gray-700">{p.nombre}</span>
+                  <div className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-gray-100 sm:block">
+                    <div className={`h-full rounded-full ${agotado ? 'bg-red-500' : 'bg-orange-400'}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className={`w-28 shrink-0 text-right text-sm font-medium ${agotado ? 'text-red-600' : 'text-orange-600'}`}>
+                    {agotado ? 'Agotado' : `${p.stock} ${p.unidad}`}
+                    <span className="ml-1 text-xs font-normal text-gray-400">/ {p.stock_minimo}</span>
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
           {totalBajoStock > productosBajoStock.length && (
-            <p className="text-xs text-gray-400 mt-3">y {totalBajoStock - productosBajoStock.length} más…</p>
+            <p className="mt-2 text-xs text-gray-400">y {totalBajoStock - productosBajoStock.length} más…</p>
           )}
-        </div>
+        </Tarjeta>
       )}
     </div>
   )
 }
 
-function StatCard({ label, value, sub, color, icon, isCurrency }: {
-  label: string; value: string; sub: string; color: string; icon: React.ReactNode; isCurrency?: boolean
+// ── Componentes ────────────────────────────────────────────────────────────
+
+function Tarjeta({ titulo, subtitulo, icono, accion, className = '', children }: {
+  titulo: string; subtitulo?: string; icono?: React.ReactNode; accion?: React.ReactNode; className?: string; children: React.ReactNode
 }) {
-  const colorMap: Record<string, string> = {
-    blue: 'bg-blue-50 text-blue-600', indigo: 'bg-indigo-50 text-indigo-600',
-    green: 'bg-green-50 text-green-600', red: 'bg-red-50 text-red-600',
-    emerald: 'bg-emerald-50 text-emerald-600', gray: 'bg-gray-100 text-gray-600',
-  }
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <div className={`w-9 h-9 rounded-lg ${colorMap[color] ?? colorMap.gray} flex items-center justify-center mb-3`}>
-        {icon}
+    <section className={`rounded-2xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02] ${className}`}>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          {icono}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">{titulo}</h3>
+            {subtitulo && <p className="mt-0.5 text-xs text-gray-500">{subtitulo}</p>}
+          </div>
+        </div>
+        {accion}
       </div>
-      <p className={`font-bold text-gray-900 ${isCurrency ? 'text-lg' : 'text-2xl'}`}>{value}</p>
-      <p className="text-sm text-gray-500 mt-0.5">{label}</p>
-      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
-    </div>
+      {children}
+    </section>
   )
+}
+
+const TONOS: Record<string, string> = {
+  verde: 'bg-green-50 text-green-600',
+  rojo: 'bg-red-50 text-red-600',
+  marca: 'bg-brand-50 text-brand-600',
+  indigo: 'bg-indigo-50 text-indigo-600',
+  gris: 'bg-gray-100 text-gray-600',
+}
+
+function Indicador({ etiqueta, valor, detalle, icono, tono, cambio, cambioInvertido, destacado, cargando, href }: {
+  etiqueta: string; valor: string; detalle?: string; icono: React.ReactNode; tono: string
+  cambio?: number | null; cambioInvertido?: boolean; destacado?: boolean; cargando?: boolean; href?: string
+}) {
+  const sube = (cambio ?? 0) >= 0
+  const bueno = cambioInvertido ? !sube : sube
+  const sinCambio = cambio !== undefined && cambio !== null && Math.abs(cambio) < 0.5
+  const contenido = (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${TONOS[tono] ?? TONOS.gris}`}>{icono}</span>
+        {cambio !== undefined && cambio !== null && !cargando && (
+          <span title="Contra el mes anterior"
+            className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${
+              sinCambio ? 'bg-gray-100 text-gray-500' : bueno ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+            {sinCambio ? null : sube ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+            {Math.abs(cambio) >= 1000 ? '+999' : Math.abs(cambio).toFixed(0)}%
+          </span>
+        )}
+      </div>
+      <p className="mt-3 text-[13px] text-gray-500">{etiqueta}</p>
+      {cargando
+        ? <div className="mt-1.5 h-6 w-24 rounded-md bg-gray-100 animate-brillo" />
+        : <p className={`mt-0.5 truncate font-semibold tracking-tight text-gray-900 ${valor.length > 12 ? 'text-lg' : 'text-2xl'}`}>{valor}</p>}
+      {detalle && <p className="mt-1 truncate text-xs text-gray-400">{detalle}</p>}
+    </>
+  )
+  const cls = `block rounded-2xl border bg-white p-4 shadow-sm shadow-black/[0.02] transition-colors ${
+    destacado ? 'border-brand-200 ring-1 ring-brand-100' : 'border-gray-200'
+  } ${href ? 'hover:border-brand-300' : ''}`
+  return href ? <Link href={href} className={cls}>{contenido}</Link> : <div className={cls}>{contenido}</div>
 }

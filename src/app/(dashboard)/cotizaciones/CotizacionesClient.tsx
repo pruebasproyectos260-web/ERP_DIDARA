@@ -6,6 +6,7 @@ import type { Cotizacion, EstadoCotizacion } from '@/types'
 import CotizacionModal from './CotizacionModal'
 import { borrar } from '@/lib/api-cliente'
 import type { ClienteParaCot, ProductoParaCot } from './CotizacionModal'
+import { aviso, confirmar } from '@/components/ui/Avisos'
 
 interface Props {
   cotizaciones: Cotizacion[]
@@ -71,7 +72,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
   }).sort((a, b) => sortDir === 'desc' ? b.id - a.id : a.id - b.id)
 
   async function eliminar(id: number) {
-    if (!confirm('¿Eliminar esta cotización?')) return
+    if (!(await confirmar({ titulo: '¿Eliminar esta cotización?', mensaje: 'Esta acción no se puede deshacer.', peligro: true }))) return
     if (!(await borrar(`/api/cotizaciones/${id}`, 'No se pudo eliminar la cotización'))) return
     setCotizaciones((prev) => prev.filter((c) => c.id !== id))
   }
@@ -92,7 +93,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
     } catch (err) {
       // Revertir: la pantalla no debe mostrar un estado que no se guardó
       if (anterior) setCotizaciones((prev) => prev.map((c) => c.id === id ? { ...c, estado: anterior } : c))
-      alert(err instanceof Error ? err.message : 'No se pudo cambiar el estado')
+      aviso.error(err instanceof Error ? err.message : 'No se pudo cambiar el estado')
     }
   }
 
@@ -175,6 +176,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
       return [cotizacion, ...prev]
     })
     setModal({ open: false, cotizacion: null })
+    aviso.exito(`Cotización ${cotizacion.folio} guardada`)
   }
 
   const puedeEditar = nivel <= 2
@@ -194,7 +196,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
         {puedeEditar && (
           <button
             onClick={() => setModal({ open: true, cotizacion: null })}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             <Plus size={16} /> Nueva Cotización
           </button>
@@ -208,7 +210,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder="Buscar por ID o cliente..."
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-56"
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 w-56"
         />
         {['', ...ESTADOS].map((e) => (
           <button
@@ -216,7 +218,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
             onClick={() => setFiltroEstado(e)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
               filtroEstado === e
-                ? 'bg-blue-600 text-white border-blue-600'
+                ? 'bg-brand-600 text-white border-brand-600'
                 : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
             }`}
           >
@@ -267,7 +269,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
               return (
                 <tr key={cot.id} className={`${cfg.row} border-b border-gray-100`}>
                   <td className="px-3 py-2.5">
-                    <span className="font-bold text-xs font-mono text-blue-700">{cot.folio}</span>
+                    <span className="font-bold text-xs font-mono text-brand-700">{cot.folio}</span>
                   </td>
                   <td className="px-3 py-2.5 text-xs text-gray-700 whitespace-nowrap">{fmtDate(cot.fecha)}</td>
                   <td className="px-3 py-2.5 font-medium text-gray-900 max-w-[180px] truncate">{clienteNombre}</td>
@@ -295,7 +297,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
                       <select
                         value={cot.estado}
                         onChange={(e) => cambiarEstado(cot.id, e.target.value as EstadoCotizacion)}
-                        className={`text-xs font-semibold px-2 py-1 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400 ${cfg.badge}`}
+                        className={`text-xs font-semibold px-2 py-1 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-brand-400 ${cfg.badge}`}
                       >
                         {ESTADOS.map((e) => (
                           <option key={e} value={e}>{e.charAt(0).toUpperCase() + e.slice(1)}</option>
@@ -311,7 +313,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
                     <div className="flex items-center gap-1 justify-end">
                       <button
                         onClick={() => setCotizacionVer(cotizacionVer?.id === cot.id ? null : cot)}
-                        className={`p-1.5 rounded-lg transition-colors ${cotizacionVer?.id === cot.id ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'}`}
+                        className={`p-1.5 rounded-lg transition-colors ${cotizacionVer?.id === cot.id ? 'text-brand-600 bg-brand-50' : 'text-gray-400 hover:text-brand-600 hover:bg-brand-50'}`}
                         title="Ver detalle"
                       >
                         <Eye size={13} />
@@ -335,7 +337,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
                       {puedeEditar && (
                         <button
                           onClick={() => setModal({ open: true, cotizacion: cot })}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
                           title="Editar"
                         >
                           <Pencil size={13} />
@@ -371,7 +373,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-3 flex-wrap">
-                  <span className="text-lg font-bold font-mono text-blue-700">{cot.folio}</span>
+                  <span className="text-lg font-bold font-mono text-brand-700">{cot.folio}</span>
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${cfg.badge}`}>
                     {cot.estado.charAt(0).toUpperCase() + cot.estado.slice(1)}
                   </span>
@@ -522,7 +524,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
                     ) : (
                       <div className="space-y-1.5">
                         {mailState.contactos.map((c) => (
-                          <label key={c.email} className="flex items-start gap-2.5 p-2.5 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-colors">
+                          <label key={c.email} className="flex items-start gap-2.5 p-2.5 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer hover:bg-brand-50 hover:border-brand-200 transition-colors">
                             <input type="checkbox" checked={mailState.selected.has(c.email)} onChange={() => toggleEmail(c.email)} className="mt-0.5 rounded" />
                             <span>
                               <span className="text-sm font-medium text-gray-800">{c.nombre}</span>

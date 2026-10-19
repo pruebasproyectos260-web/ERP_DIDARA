@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+/* `dark:` de Tailwind se activa con la misma clase que ya usa el toggle del Header */
+@custom-variant dark (&:where(.dark-mode, .dark-mode *));
+
+/* ── Marca Didara TI (verde azulado del logo: #187d78) ───── */
+@theme {
+  --color-brand-50:  #effaf8;
+  --color-brand-100: #d6f1ed;
+  --color-brand-200: #aee2db;
+  --color-brand-300: #7ccbc1;
+  --color-brand-400: #4aaea3;
+  --color-brand-500: #2a9389;
+  --color-brand-600: #187d78;
+  --color-brand-700: #156561;
+  --color-brand-800: #15524f;
+  --color-brand-900: #144442;
+  --color-brand-950: #072827;
+
+  --animate-aparecer: aparecer 160ms ease-out;
+  --animate-subir: subir 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-brillo: brillo 1.4s ease-in-out infinite;
+  --animate-deslizar: deslizar 220ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  @keyframes aparecer { from { opacity: 0 } to { opacity: 1 } }
+  @keyframes subir { from { opacity: 0; transform: translateY(8px) scale(0.98) } to { opacity: 1; transform: none } }
+  @keyframes brillo { 0%, 100% { opacity: 1 } 50% { opacity: 0.45 } }
+  @keyframes deslizar { from { transform: translateX(-100%) } to { transform: none } }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -12,38 +40,54 @@ html, body {
   display: block;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-label);
   margin-bottom: 0.25rem;
 }
 
 /* ── CSS Variables ─────────────────────────────────────── */
 :root {
-  --bg:           #f3f4f6;
+  --bg:           #f4f6f6;
   --surface:      #ffffff;
-  --surface-2:    #f9fafb;
-  --border:       #e5e7eb;
+  --surface-2:    #f8fafa;
+  --border:       #e3e8e8;
   --text:         #111827;
   --text-muted:   #6b7280;
-  --primary:      #1a7a6e;
-  --primary-hover:#155f56;
+  --text-label:   #374151;
+  --primary:      #187d78;
+  --primary-hover:#156561;
   --danger:       #dc2626;
   --input-bg:     #ffffff;
 }
 
 body.dark-mode {
-  --bg:           #111827;
-  --surface:      #1f2937;
-  --surface-2:    #374151;
-  --border:       #4b5563;
-  --text:         #f9fafb;
-  --text-muted:   #9ca3af;
-  --primary:      #34d399;
-  --primary-hover:#10b981;
+  --bg:           #0b1414;
+  --surface:      #121d1d;
+  --surface-2:    #1a2828;
+  --border:       #2a3a3a;
+  --text:         #eef4f3;
+  --text-muted:   #94a3a1;
+  --text-label:   #cfdad8;
+  --primary:      #4aaea3;
+  --primary-hover:#7ccbc1;
   --danger:       #f87171;
-  --input-bg:     #374151;
+  --input-bg:     #182525;
 }
 
+/* ── Foco visible y selección con color de marca ────────── */
+/* Solo botones y enlaces: los campos de texto ya traen su propio anillo de foco */
+:where(a, button, summary, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+::selection { background: var(--color-brand-200); color: var(--color-brand-900); }
+
+/* Barras de desplazamiento discretas */
+* { scrollbar-width: thin; scrollbar-color: #c4cfce transparent; }
+body.dark-mode * { scrollbar-color: #2f4141 transparent; }
+
 /* ── Dark mode global overrides ────────────────────────── */
+/* Las pantallas existentes usan grises de Tailwind fijos; aquí se adaptan.
+   Los componentes nuevos usan `dark:` directamente. */
 body.dark-mode {
   background-color: var(--bg);
   color: var(--text);
@@ -83,6 +127,41 @@ body.dark-mode .shadow-xl { box-shadow: 0 20px 40px rgba(0,0,0,0.6) !important; 
 
 body.dark-mode .hover\:bg-gray-50:hover { background-color: var(--surface-2) !important; }
 body.dark-mode .hover\:bg-gray-100:hover { background-color: var(--surface-2) !important; }
+
+/* Fondos y textos de color (etiquetas de estado, filas resaltadas, avisos):
+   en oscuro se vuelven tintes translúcidos con texto claro para que se lean. */
+body.dark-mode :is(.bg-brand-50, .bg-brand-100)     { background-color: rgb(42 147 137 / 0.16) !important; }
+body.dark-mode :is(.bg-blue-50, .bg-blue-100)       { background-color: rgb(59 130 246 / 0.15) !important; }
+body.dark-mode :is(.bg-indigo-50, .bg-indigo-100)   { background-color: rgb(99 102 241 / 0.16) !important; }
+body.dark-mode :is(.bg-green-50, .bg-green-100)     { background-color: rgb(34 197 94 / 0.14) !important; }
+body.dark-mode :is(.bg-emerald-50, .bg-emerald-100) { background-color: rgb(16 185 129 / 0.14) !important; }
+body.dark-mode :is(.bg-teal-50, .bg-teal-100)       { background-color: rgb(20 184 166 / 0.14) !important; }
+body.dark-mode :is(.bg-yellow-50, .bg-yellow-100)   { background-color: rgb(234 179 8 / 0.14) !important; }
+body.dark-mode :is(.bg-amber-50, .bg-amber-100)     { background-color: rgb(245 158 11 / 0.14) !important; }
+body.dark-mode :is(.bg-orange-50, .bg-orange-100)   { background-color: rgb(249 115 22 / 0.14) !important; }
+body.dark-mode :is(.bg-red-50, .bg-red-100)         { background-color: rgb(239 68 68 / 0.14) !important; }
+body.dark-mode :is(.bg-purple-50, .bg-purple-100)   { background-color: rgb(168 85 247 / 0.16) !important; }
+
+body.dark-mode :is(.text-brand-600, .text-brand-700, .text-brand-800)       { color: #7ccbc1 !important; }
+body.dark-mode :is(.text-blue-600, .text-blue-700, .text-blue-800)          { color: #93c5fd !important; }
+body.dark-mode :is(.text-indigo-600, .text-indigo-700)                      { color: #a5b4fc !important; }
+body.dark-mode :is(.text-green-600, .text-green-700, .text-green-800)       { color: #86efac !important; }
+body.dark-mode :is(.text-emerald-600, .text-emerald-700)                    { color: #6ee7b7 !important; }
+body.dark-mode :is(.text-teal-700)                                          { color: #5eead4 !important; }
+body.dark-mode :is(.text-yellow-700, .text-yellow-800)                      { color: #fde047 !important; }
+body.dark-mode :is(.text-amber-600, .text-amber-700, .text-amber-800)       { color: #fcd34d !important; }
+body.dark-mode :is(.text-orange-600, .text-orange-700)                      { color: #fdba74 !important; }
+body.dark-mode :is(.text-red-600, .text-red-700)                            { color: #fca5a5 !important; }
+body.dark-mode :is(.text-purple-600, .text-purple-700)                      { color: #d8b4fe !important; }
+
+body.dark-mode :is(.border-brand-200, .border-brand-300)   { border-color: rgb(42 147 137 / 0.4) !important; }
+body.dark-mode :is(.border-blue-200, .border-blue-300)     { border-color: rgb(59 130 246 / 0.4) !important; }
+body.dark-mode :is(.border-green-200, .border-green-300)   { border-color: rgb(34 197 94 / 0.35) !important; }
+body.dark-mode :is(.border-yellow-200, .border-yellow-300) { border-color: rgb(234 179 8 / 0.35) !important; }
+body.dark-mode :is(.border-amber-200, .border-amber-300)   { border-color: rgb(245 158 11 / 0.35) !important; }
+body.dark-mode :is(.border-orange-200, .border-orange-300) { border-color: rgb(249 115 22 / 0.35) !important; }
+body.dark-mode :is(.border-red-200, .border-red-300)       { border-color: rgb(239 68 68 / 0.35) !important; }
+body.dark-mode :is(.border-purple-200, .border-purple-300) { border-color: rgb(168 85 247 / 0.4) !important; }
 
 /* ── Mobile touch scrolling ─────────────────────────────── */
 .overflow-x-auto {

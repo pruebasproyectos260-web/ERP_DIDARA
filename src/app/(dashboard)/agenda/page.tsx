@@ -5,6 +5,7 @@ import { Plus, ChevronLeft, ChevronRight, Pencil, Trash2, Trash, Bell } from 'lu
 import { createClient } from '@/lib/supabase/client'
 import { borrar } from '@/lib/api-cliente'
 import type { Evento, Cliente, Usuario } from '@/types'
+import { aviso, confirmar } from '@/components/ui/Avisos'
 
 const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
@@ -237,7 +238,8 @@ export default function AgendaPage() {
       body: JSON.stringify(payload),
     })
     const json = await res.json()
-    if (!res.ok) return alert(json.error)
+    if (!res.ok) return aviso.error(json.error ?? 'No se pudo guardar el evento')
+    aviso.exito(editando ? 'Evento actualizado' : 'Evento creado')
     if (editando) {
       setEventos(prev => prev.map(ev => ev.id === editando.id ? json.data : ev))
     } else {
@@ -247,13 +249,13 @@ export default function AgendaPage() {
   }
 
   async function eliminar(id: number) {
-    if (!confirm('¿Eliminar este evento?')) return
+    if (!(await confirmar({ titulo: '¿Eliminar este evento?', mensaje: 'Esta acción no se puede deshacer.', peligro: true }))) return
     if (!(await borrar(`/api/agenda/${id}`, 'No se pudo eliminar el evento'))) return
     setEventos(prev => prev.filter(ev => ev.id !== id))
   }
 
   async function limpiarMesAnterior() {
-    if (!confirm('¿Eliminar todos los eventos del mes anterior?')) return
+    if (!(await confirmar({ titulo: '¿Eliminar todos los eventos del mes anterior?', mensaje: 'Esta acción no se puede deshacer.', peligro: true }))) return
     const mesPasado = new Date(mes.getFullYear(), mes.getMonth() - 1, 1)
     const desde = primerDiaMes(mesPasado).toISOString()
     const hasta = ultimoDiaMes(mesPasado).toISOString()
@@ -261,7 +263,7 @@ export default function AgendaPage() {
     const json = await res.json()
     const eventosPasados: Evento[] = json.data ?? []
     await Promise.all(eventosPasados.map(ev => fetch(`/api/agenda/${ev.id}`, { method: 'DELETE' })))
-    alert(`${eventosPasados.length} evento(s) eliminados.`)
+    aviso.exito(`${eventosPasados.length} evento(s) eliminados`)
   }
 
   function toggleResponsable(nombre: string, checked: boolean) {
@@ -279,7 +281,7 @@ export default function AgendaPage() {
           {eventosProximos.length > 0 && (
             <button
               onClick={() => setModalNotif(true)}
-              className="relative flex items-center gap-1.5 text-xs text-blue-600 border border-blue-300 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
+              className="relative flex items-center gap-1.5 text-xs text-brand-600 border border-brand-300 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
             >
               <Bell size={13} />
               {eventosProximos.length} próximo{eventosProximos.length > 1 ? 's' : ''}
@@ -295,7 +297,7 @@ export default function AgendaPage() {
           </button>
           <button
             onClick={abrirNuevo}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             <Plus size={16} />
             Nuevo evento
@@ -350,15 +352,15 @@ export default function AgendaPage() {
                   onClick={() => setDiaSeleccionado(dia)}
                   onDoubleClick={() => { setDiaSeleccionado(dia); abrirNuevo() }}
                   className={`h-16 border-b border-r border-gray-100 flex flex-col items-center pt-2 gap-0.5 transition-colors ${
-                    esSeleccionado ? 'bg-blue-50' : 'hover:bg-gray-50'
+                    esSeleccionado ? 'bg-brand-50' : 'hover:bg-gray-50'
                   } ${esPasado && !esHoy ? 'opacity-50' : ''}`}
                 >
                   <span
                     className={`text-sm font-medium w-7 h-7 flex items-center justify-center rounded-full ${
                       esHoy
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-brand-600 text-white'
                         : esSeleccionado
-                        ? 'text-blue-600'
+                        ? 'text-brand-600'
                         : 'text-gray-700'
                     }`}
                   >
@@ -391,7 +393,7 @@ export default function AgendaPage() {
         {eventosDia.length === 0 ? (
           <div className="py-8 text-center text-gray-400 text-sm">
             No hay eventos este día.{' '}
-            <button onClick={abrirNuevo} className="text-blue-600 hover:underline">Agregar uno</button>
+            <button onClick={abrirNuevo} className="text-brand-600 hover:underline">Agregar uno</button>
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
@@ -428,7 +430,7 @@ export default function AgendaPage() {
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => abrirEditar(ev)}
-                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
                     >
                       <Pencil size={14} />
                     </button>
@@ -466,7 +468,7 @@ export default function AgendaPage() {
                   value={form.titulo}
                   onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))}
                   required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
 
@@ -477,7 +479,7 @@ export default function AgendaPage() {
                   <select
                     value={form.tipo}
                     onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                   >
                     {TIPOS_EVENTO.map(t => (
                       <option key={t.valor} value={t.valor}>{t.emoji} {t.label}</option>
@@ -489,7 +491,7 @@ export default function AgendaPage() {
                   <select
                     value={form.estado}
                     onChange={e => setForm(f => ({ ...f, estado: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                   >
                     {ESTADOS.map(s => (
                       <option key={s} value={s}>{s}</option>
@@ -506,7 +508,7 @@ export default function AgendaPage() {
                   value={form.fecha}
                   onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
                   required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
 
@@ -518,7 +520,7 @@ export default function AgendaPage() {
                       type="time"
                       value={form.hora_inicio}
                       onChange={e => setForm(f => ({ ...f, hora_inicio: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
                   <div>
@@ -527,7 +529,7 @@ export default function AgendaPage() {
                       type="time"
                       value={form.hora_fin}
                       onChange={e => setForm(f => ({ ...f, hora_fin: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
                 </div>
@@ -538,7 +540,7 @@ export default function AgendaPage() {
                   type="checkbox"
                   checked={form.todo_el_dia}
                   onChange={e => setForm(f => ({ ...f, todo_el_dia: e.target.checked }))}
-                  className="rounded border-gray-300 text-blue-600"
+                  className="rounded border-gray-300 text-brand-600"
                 />
                 <span className="text-sm text-gray-700">Todo el día</span>
               </label>
@@ -549,7 +551,7 @@ export default function AgendaPage() {
                 <select
                   value={form.cliente_id}
                   onChange={e => setForm(f => ({ ...f, cliente_id: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   <option value="">Sin cliente</option>
                   {clientes.map(c => (
@@ -566,7 +568,7 @@ export default function AgendaPage() {
                     type="text"
                     value={form.lugar}
                     onChange={e => setForm(f => ({ ...f, lugar: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
                 <div>
@@ -575,7 +577,7 @@ export default function AgendaPage() {
                     type="text"
                     value={form.contacto}
                     onChange={e => setForm(f => ({ ...f, contacto: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
               </div>
@@ -593,7 +595,7 @@ export default function AgendaPage() {
                         type="checkbox"
                         checked={responsablesSeleccionados.includes(u.nombre)}
                         onChange={e => toggleResponsable(u.nombre, e.target.checked)}
-                        className="rounded border-gray-300 text-blue-600"
+                        className="rounded border-gray-300 text-brand-600"
                       />
                       {u.nombre}
                     </label>
@@ -608,7 +610,7 @@ export default function AgendaPage() {
                   value={form.descripcion}
                   onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
                   rows={2}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
                 />
               </div>
 
@@ -619,7 +621,7 @@ export default function AgendaPage() {
                   value={form.notas_adicionales}
                   onChange={e => setForm(f => ({ ...f, notas_adicionales: e.target.value }))}
                   rows={2}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
                 />
               </div>
 
@@ -633,7 +635,7 @@ export default function AgendaPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+                  className="px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 rounded-lg"
                 >
                   Guardar
                 </button>
@@ -649,7 +651,7 @@ export default function AgendaPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <div className="flex items-center gap-2">
-                <Bell size={18} className="text-blue-600" />
+                <Bell size={18} className="text-brand-600" />
                 <h2 className="text-lg font-semibold">Tus próximos eventos</h2>
               </div>
               <button onClick={() => setModalNotif(false)} className="text-gray-400 hover:text-gray-600">✕</button>
@@ -684,7 +686,7 @@ export default function AgendaPage() {
             <div className="px-6 pb-4">
               <button
                 onClick={() => setModalNotif(false)}
-                className="w-full px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+                className="w-full px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 rounded-lg"
               >
                 Entendido
               </button>

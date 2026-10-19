@@ -1,8 +1,9 @@
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import Sidebar from '@/components/layout/Sidebar'
-import Header from '@/components/layout/Header'
+import Shell from '@/components/layout/Shell'
+import { COOKIE_SIDEBAR } from '@/components/layout/navegacion'
 import GastosFijosAlert from '@/components/layout/GastosFijosAlert'
 import AgendaAlert from '@/components/layout/AgendaAlert'
 
@@ -28,25 +29,25 @@ export default async function DashboardLayout({
 
   void keepAlive()
 
-  const { data: perfil } = await supabase
-    .from('usuarios')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const [{ data: perfil }, cookieStore] = await Promise.all([
+    supabase.from('usuarios').select('*').eq('id', user.id).single(),
+    cookies(),
+  ])
 
   const esContador = perfil?.es_contador ?? false
 
   return (
-    <div className="flex h-full min-h-screen">
-      <Sidebar nivel={perfil?.nivel ?? 2} />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <Header user={user} perfil={perfil} esContador={esContador} />
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
-        </main>
-      </div>
+    <>
+      <Shell
+        user={user}
+        perfil={perfil}
+        esContador={esContador}
+        colapsadoInicial={cookieStore.get(COOKIE_SIDEBAR)?.value === '1'}
+      >
+        {children}
+      </Shell>
       <GastosFijosAlert nivel={perfil?.nivel ?? 2} />
       <AgendaAlert userId={user.id} />
-    </div>
+    </>
   )
 }

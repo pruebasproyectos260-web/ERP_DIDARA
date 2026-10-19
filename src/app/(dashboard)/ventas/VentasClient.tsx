@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, X } from 'lucide-react'
 import type { GananciaFija, IngresoManual } from '@/types'
 import { borrar } from '@/lib/api-cliente'
+import { aviso, confirmar } from '@/components/ui/Avisos'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
@@ -138,11 +139,12 @@ export default function VentasClient({ cotizaciones, reportes, ingresosManuales,
     if (!res.ok) return setErr(json.error)
     setManuales((p) => [json.data, ...p])
     setModalManual(false)
+    aviso.exito('Ingreso registrado')
     setFManual({ fecha: '', monto: '', descripcion: '', notas: '' })
   }
 
   async function eliminarManual(id: number) {
-    if (!confirm('¿Eliminar este ingreso?')) return
+    if (!(await confirmar({ titulo: '¿Eliminar este ingreso?', mensaje: 'Esta acción no se puede deshacer.', peligro: true }))) return
     if (!(await borrar(`/api/ingresos-manuales/${id}`, 'No se pudo eliminar el ingreso'))) return
     setManuales((p) => p.filter((m) => m.id !== id))
   }
@@ -158,6 +160,7 @@ export default function VentasClient({ cotizaciones, reportes, ingresosManuales,
     if (!res.ok) return setErr(json.error)
     setCots((p) => p.map((c) => c.id === modalGanancia.id ? { ...c, ...json.data } : c))
     setModalGanancia(null)
+    aviso.exito('Ganancia actualizada')
   }
 
   async function guardarFija(e: React.FormEvent) {
@@ -169,20 +172,21 @@ export default function VentasClient({ cotizaciones, reportes, ingresosManuales,
     if (!res.ok) return setErr(json.error)
     if (editFija) setFijas((p) => p.map((f) => f.id === editFija.id ? json.data : f))
     else setFijas((p) => [json.data, ...p])
+    aviso.exito(editFija ? 'Ganancia fija actualizada' : 'Ganancia fija agregada')
     setEditFija(null); setModalFija(false)
     setFFija({ descripcion: '', monto: '', dia: '', fecha_inicio: '', notas: '' })
   }
 
   async function eliminarFija(id: number) {
-    if (!confirm('¿Eliminar esta ganancia fija?')) return
+    if (!(await confirmar({ titulo: '¿Eliminar esta ganancia fija?', mensaje: 'Esta acción no se puede deshacer.', peligro: true }))) return
     if (!(await borrar(`/api/ganancias-fijas/${id}`, 'No se pudo eliminar la ganancia fija'))) return
     setFijas((p) => p.filter((f) => f.id !== id))
   }
 
   const puedeEliminar = nivel <= 1
 
-  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
-  const btnPrimary = 'px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors'
+  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500'
+  const btnPrimary = 'px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors'
   const btnSecondary = 'px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors'
 
   return (
@@ -217,7 +221,7 @@ export default function VentasClient({ cotizaciones, reportes, ingresosManuales,
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
           { label: 'Cotizaciones',      value: totalCots, color: 'text-green-700 bg-green-50 border-green-200' },
-          { label: 'Reportes',          value: totalReps, color: 'text-blue-700 bg-blue-50 border-blue-200' },
+          { label: 'Reportes',          value: totalReps, color: 'text-brand-700 bg-brand-50 border-brand-200' },
           { label: 'Manuales',          value: totalMans, color: 'text-orange-700 bg-orange-50 border-orange-200' },
           { label: 'Fijas/mes',         value: totalFija, color: 'text-purple-700 bg-purple-50 border-purple-200' },
           { label: 'Total general',     value: totalGen,  color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
@@ -277,7 +281,7 @@ export default function VentasClient({ cotizaciones, reportes, ingresosManuales,
                         </tr></thead>
                         <tbody>{mesNodo.cots.map((c) => (
                           <tr key={c.id} className="border-t border-gray-100 text-sm">
-                            <td className="px-3 py-2 font-medium text-blue-700">{c.folio}</td>
+                            <td className="px-3 py-2 font-medium text-brand-700">{c.folio}</td>
                             <td className="px-3 py-2 text-gray-700">{c.cliente?.nombre ?? '-'}</td>
                             <td className="px-3 py-2 text-right">{fmt(c.total)}</td>
                             <td className="px-3 py-2 text-right font-semibold text-green-700">
@@ -286,7 +290,7 @@ export default function VentasClient({ cotizaciones, reportes, ingresosManuales,
                             </td>
                             <td className="px-3 py-2">
                               <button onClick={() => { setModalGanancia(c); setFGan({ ganancia_real: String(c.ganancia_real ?? c.ganancia_total ?? ''), pct_didara: String(c.pct_didara ?? 100) }); setErr('') }}
-                                className="p-1 text-gray-400 hover:text-blue-600 rounded">
+                                className="p-1 text-gray-400 hover:text-brand-600 rounded">
                                 <Pencil size={13} />
                               </button>
                             </td>
@@ -306,10 +310,10 @@ export default function VentasClient({ cotizaciones, reportes, ingresosManuales,
                         </tr></thead>
                         <tbody>{mesNodo.reps.map((r) => (
                           <tr key={r.id} className="border-t border-gray-100 text-sm">
-                            <td className="px-3 py-2 font-medium text-blue-700">{r.folio}</td>
+                            <td className="px-3 py-2 font-medium text-brand-700">{r.folio}</td>
                             <td className="px-3 py-2 text-gray-700">{r.cliente?.nombre ?? '-'}</td>
                             <td className="px-3 py-2 text-gray-500 text-xs">{(r.tipo_servicio ?? []).join(', ')}</td>
-                            <td className="px-3 py-2 text-right font-semibold text-blue-700">{fmt(r.total ?? 0)}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-brand-700">{fmt(r.total ?? 0)}</td>
                           </tr>
                         ))}</tbody>
                       </SubTable>
@@ -354,7 +358,7 @@ export default function VentasClient({ cotizaciones, reportes, ingresosManuales,
                             <td className="px-3 py-2 text-center text-gray-500">{g.dia ? `Día ${g.dia}` : '—'}</td>
                             <td className="px-3 py-2 flex items-center gap-1">
                               <button onClick={() => { setEditFija(g); setFFija({ descripcion: g.descripcion, monto: String(g.monto), dia: String(g.dia ?? ''), fecha_inicio: g.fecha_inicio ?? '', notas: g.notas ?? '' }); setModalFija(true); setErr('') }}
-                                className="p-1 text-gray-400 hover:text-blue-600 rounded"><Pencil size={13} /></button>
+                                className="p-1 text-gray-400 hover:text-brand-600 rounded"><Pencil size={13} /></button>
                               {puedeEliminar && <button onClick={() => eliminarFija(g.id)} className="p-1 text-gray-400 hover:text-red-500 rounded"><Trash2 size={13} /></button>}
                             </td>
                           </tr>
@@ -464,7 +468,7 @@ export default function VentasClient({ cotizaciones, reportes, ingresosManuales,
 
 function SubTable({ title, color, children }: { title: string; color: string; children: React.ReactNode }) {
   const colors: Record<string, string> = {
-    green: 'text-green-700 border-green-200', blue: 'text-blue-700 border-blue-200',
+    green: 'text-green-700 border-green-200', blue: 'text-brand-700 border-brand-200',
     orange: 'text-orange-700 border-orange-200', purple: 'text-purple-700 border-purple-200',
   }
   return (

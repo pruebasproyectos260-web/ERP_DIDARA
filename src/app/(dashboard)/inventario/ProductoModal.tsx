@@ -205,7 +205,7 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
               type="text"
               value={form.nombre}
               onChange={e => setField('nombre', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
 
@@ -220,8 +220,8 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
                   onClick={() => toggleCategoria(cat)}
                   className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${
                     categoriasSeleccionadas.includes(cat)
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                      ? 'bg-brand-600 text-white border-brand-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-brand-400'
                   }`}
                 >
                   {cat}
@@ -242,7 +242,7 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
               <select
                 value={form.unidad}
                 onChange={e => setField('unidad', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 {Object.entries(UNIDADES_SAT).map(([val, { nombre, clave }]) => (
                   <option key={val} value={val}>{val} — {nombre} ({clave})</option>
@@ -255,7 +255,7 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
                 value={form.descripcion}
                 onChange={e => setField('descripcion', e.target.value)}
                 rows={2}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
               />
             </div>
           </div>
@@ -305,13 +305,13 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
                 <label className="block text-xs text-gray-600 mb-1">Precio compra</label>
                 <input type="number" min="0" step="0.01" value={form.precio_compra_neto}
                   onChange={e => setField('precio_compra_neto', e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={form.precio_compra_incluye_iva}
                   onChange={e => setField('precio_compra_incluye_iva', e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600"
+                  className="rounded border-gray-300 text-brand-600"
                 />
                 <span className="text-xs text-gray-700">El precio de compra ya incluye IVA</span>
               </label>
@@ -321,12 +321,12 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
                     <label className="block text-xs text-gray-600 mb-1">IVA compra (%)</label>
                     <input type="number" min="0" max="100" step="0.01" value={form.iva_compra}
                       onChange={e => setField('iva_compra', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
-                  <div className="bg-blue-50 rounded-lg px-3 py-2">
-                    <p className="text-xs text-blue-600 font-medium">Precio c/IVA</p>
-                    <p className="text-sm font-bold text-blue-800">${precioCompraConIva.toFixed(2)}</p>
+                  <div className="bg-brand-50 rounded-lg px-3 py-2">
+                    <p className="text-xs text-brand-600 font-medium">Precio c/IVA</p>
+                    <p className="text-sm font-bold text-brand-800">${precioCompraConIva.toFixed(2)}</p>
                   </div>
                 </div>
               )}
@@ -340,14 +340,14 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
               <input type="text" value={form.clave_sat_producto}
                 onChange={e => setField('clave_sat_producto', e.target.value)}
                 placeholder="ej. 46171621"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Clave SAT Unidad
                 {UNIDADES_SAT[form.unidad] && (
-                  <span className="ml-1 text-xs text-blue-500 font-normal">
+                  <span className="ml-1 text-xs text-brand-500 font-normal">
                     — {UNIDADES_SAT[form.unidad].nombre}
                   </span>
                 )}
@@ -355,7 +355,7 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
               <input type="text" value={form.clave_sat_unidad}
                 onChange={e => setField('clave_sat_unidad', e.target.value)}
                 placeholder="ej. H87"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
               />
             </div>
           </div>
@@ -381,7 +381,7 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="text-white text-xs bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded-lg"
+                    className="text-white text-xs bg-brand-600 hover:bg-brand-700 px-2 py-1 rounded-lg"
                   >
                     Cambiar
                   </button>
@@ -398,7 +398,7 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors gap-2"
+                className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 hover:border-brand-400 hover:text-brand-500 transition-colors gap-2"
               >
                 <ImageIcon size={28} />
                 <span className="text-sm font-medium">Seleccionar imagen</span>
@@ -406,7 +406,7 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
               </button>
             )}
             {subiendoImagen && (
-              <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+              <p className="text-xs text-brand-600 mt-1 flex items-center gap-1">
                 <Upload size={12} className="animate-bounce" /> Subiendo imagen...
               </p>
             )}
@@ -418,14 +418,14 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
               <label className="block text-sm font-medium text-gray-700 mb-1">Stock actual</label>
               <input type="number" min="0" step="0.001" value={form.stock}
                 onChange={e => setField('stock', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Stock mínimo</label>
               <input type="number" min="0" step="0.001" value={form.stock_minimo}
                 onChange={e => setField('stock_minimo', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
           </div>
@@ -447,7 +447,7 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
           <button
             onClick={handleSubmit}
             disabled={loading || subiendoImagen}
-            className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 rounded-lg transition-colors"
           >
             {loading ? 'Guardando...' : subiendoImagen ? 'Subiendo imagen...' : 'Guardar'}
           </button>

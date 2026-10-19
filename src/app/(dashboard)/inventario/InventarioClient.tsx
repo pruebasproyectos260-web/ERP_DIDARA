@@ -5,6 +5,7 @@ import { Plus, Search, Pencil, Trash2, AlertCircle } from 'lucide-react'
 import type { Producto } from '@/types'
 import ProductoModal from './ProductoModal'
 import { borrar } from '@/lib/api-cliente'
+import { aviso, confirmar } from '@/components/ui/Avisos'
 
 interface Props {
   productos: Producto[]
@@ -64,7 +65,7 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
   const valorInventario = productos.reduce((acc, p) => acc + (p.precio_compra_neto ?? 0) * p.stock, 0)
 
   async function eliminar(id: number) {
-    if (!confirm('¿Eliminar este producto?')) return
+    if (!(await confirmar({ titulo: '¿Eliminar este producto?', mensaje: 'Esta acción no se puede deshacer.', peligro: true }))) return
     if (!(await borrar(`/api/inventario/${id}`, 'No se pudo eliminar el producto'))) return
     setProductos(prev => prev.filter(p => p.id !== id))
   }
@@ -76,6 +77,7 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
       return [producto, ...prev]
     })
     setModal({ open: false, producto: null })
+    aviso.exito(`Producto ${producto.nombre} guardado`)
   }
 
   const puedeAgregar    = nivel <= 2
@@ -94,7 +96,7 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
         {puedeAgregar && (
           <button
             onClick={() => setModal({ open: true, producto: null })}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             <Plus size={16} /> Nuevo producto
           </button>
@@ -105,7 +107,7 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
       <div className="grid grid-cols-4 gap-3">
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total productos</p>
-          <p className="text-2xl font-bold text-blue-600 mt-1">{totalProductos}</p>
+          <p className="text-2xl font-bold text-brand-600 mt-1">{totalProductos}</p>
         </div>
         <button
           onClick={() => setStockFiltro(prev => prev === 'sinstock' ? null : 'sinstock')}
@@ -137,7 +139,7 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
           value={busqueda}
           onChange={e => setBusqueda(e.target.value)}
           placeholder="Buscar por ID, nombre o descripción..."
-          className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
       </div>
 
@@ -151,8 +153,8 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
               onClick={() => setCategoriaFiltro(prev => prev === cat ? '' : cat)}
               className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${
                 categoriaFiltro === cat
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                  ? 'bg-brand-600 text-white border-brand-600'
+                  : 'bg-white text-gray-600 border-gray-300 hover:border-brand-400'
               }`}
             >
               {cat}
@@ -201,7 +203,7 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
                 <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                   {/* ID */}
                   <td className="px-3 py-2.5">
-                    <span className="text-xs font-bold text-blue-600 font-mono">{p.codigo ?? `#${p.id}`}</span>
+                    <span className="text-xs font-bold text-brand-600 font-mono">{p.codigo ?? `#${p.id}`}</span>
                   </td>
 
                   {/* Imagen */}
@@ -232,7 +234,7 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
                   <td className="px-3 py-2.5">
                     <div className="flex flex-wrap gap-1">
                       {cats.length === 0 ? <span className="text-gray-300 text-xs">—</span> : cats.map(c => (
-                        <span key={c} className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap">{c}</span>
+                        <span key={c} className="text-[10px] bg-brand-50 text-brand-700 px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap">{c}</span>
                       ))}
                     </div>
                   </td>
@@ -282,7 +284,7 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
                     <div className="flex items-center gap-1 justify-end">
                       {puedeEditar && (
                         <button onClick={() => setModal({ open: true, producto: p })}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                          className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">
                           <Pencil size={13} />
                         </button>
                       )}

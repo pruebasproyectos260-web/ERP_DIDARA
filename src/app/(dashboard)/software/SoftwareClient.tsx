@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { Plus, Pencil, Trash2, X, ExternalLink, Monitor, Search } from 'lucide-react'
 import { borrar } from '@/lib/api-cliente'
+import { aviso, confirmar } from '@/components/ui/Avisos'
 
 interface Software {
   id: number
@@ -17,8 +18,8 @@ interface Props {
   nivel: number
 }
 
-const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
-const btnPrimary = 'px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors'
+const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500'
+const btnPrimary = 'px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors'
 const btnSecondary = 'px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors'
 
 const emptyForm = { nombre: '', enlace: '', descripcion: '' }
@@ -118,11 +119,12 @@ export default function SoftwareClient({ softwareInit, nivel }: Props) {
     } else {
       setLista((p) => [...p, json.data].sort((a, b) => a.nombre.localeCompare(b.nombre)))
     }
+    aviso.exito(editando ? 'Software actualizado' : 'Software agregado')
     cerrar()
   }
 
   async function eliminar(id: number, nombre: string) {
-    if (!confirm(`¿Eliminar "${nombre}"?`)) return
+    if (!(await confirmar({ titulo: `¿Eliminar "${nombre}"?`, mensaje: 'Esta acción no se puede deshacer.', peligro: true }))) return
     if (!(await borrar(`/api/software/${id}`, 'No se pudo eliminar el software'))) return
     setLista((p) => p.filter((s) => s.id !== id))
     if (busqueda) setBusqueda('')
@@ -133,9 +135,9 @@ export default function SoftwareClient({ softwareInit, nivel }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
-          <Monitor className="text-blue-600" size={22} />
+          <Monitor className="text-brand-600" size={22} />
           <h1 className="text-2xl font-bold text-gray-900">Software</h1>
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+          <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-medium">
             {lista.length}
           </span>
         </div>
@@ -155,7 +157,7 @@ export default function SoftwareClient({ softwareInit, nivel }: Props) {
           value={busqueda}
           onChange={(e) => handleBusquedaChange(e.target.value)}
           onFocus={() => busqueda.trim() && setMostrarSug(true)}
-          className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
         {busqueda && (
           <button
@@ -171,7 +173,7 @@ export default function SoftwareClient({ softwareInit, nivel }: Props) {
               <li
                 key={s.id}
                 onMouseDown={() => seleccionarSugerencia(s)}
-                className="px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer flex items-center gap-2"
+                className="px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50 hover:text-brand-700 cursor-pointer flex items-center gap-2"
               >
                 <Monitor size={13} className="text-gray-400 shrink-0" />
                 <span className="font-medium">{s.nombre}</span>
@@ -204,7 +206,7 @@ export default function SoftwareClient({ softwareInit, nivel }: Props) {
                   <tr key={s.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-2">
-                        <Monitor size={15} className="text-blue-500 shrink-0" />
+                        <Monitor size={15} className="text-brand-500 shrink-0" />
                         <span className="font-medium text-gray-900">{s.nombre}</span>
                       </div>
                     </td>
@@ -216,7 +218,7 @@ export default function SoftwareClient({ softwareInit, nivel }: Props) {
                         href={s.enlace}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg transition-colors"
                       >
                         <ExternalLink size={12} />
                         Descargar
@@ -227,7 +229,7 @@ export default function SoftwareClient({ softwareInit, nivel }: Props) {
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => abrirEditar(s)}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
                           >
                             <Pencil size={14} />
                           </button>

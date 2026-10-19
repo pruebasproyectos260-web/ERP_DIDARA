@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Check, Eye, EyeOff, KeyRound, Loader2, X } from 'lucide-react'
 
-const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500'
 
 export default function CambiarContrasenaModal({ onClose }: { onClose: () => void }) {
   const [actual, setActual] = useState('')
@@ -44,7 +44,7 @@ export default function CambiarContrasenaModal({ onClose }: { onClose: () => voi
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <KeyRound size={16} className="text-blue-600" />
+            <KeyRound size={16} className="text-brand-600" />
             <h3 className="font-semibold text-gray-900">Cambiar mi contraseña</h3>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
@@ -57,7 +57,7 @@ export default function CambiarContrasenaModal({ onClose }: { onClose: () => voi
             </div>
             <p className="text-sm text-gray-700">Tu contraseña se cambió correctamente.</p>
             <p className="text-xs text-gray-500">Guárdala en el administrador de contraseñas de tu navegador.</p>
-            <button onClick={onClose} className="mt-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
+            <button onClick={onClose} className="mt-2 px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg">
               Listo
             </button>
           </div>
@@ -94,7 +94,7 @@ export default function CambiarContrasenaModal({ onClose }: { onClose: () => voi
                 Cancelar
               </button>
               <button type="submit" disabled={guardando}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg">
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-60 rounded-lg">
                 {guardando && <Loader2 size={14} className="animate-spin" />}
                 Guardar
               </button>

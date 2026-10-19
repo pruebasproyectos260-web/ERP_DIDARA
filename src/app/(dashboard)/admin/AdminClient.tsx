@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { History, Pencil, Plus, Settings, Trash2, Users } from 'lucide-react'
 import type { Usuario, Configuracion } from '@/types'
 import ActividadPanel from './ActividadPanel'
+import { aviso, confirmar } from '@/components/ui/Avisos'
 
 interface Props {
   usuarios: Usuario[]
@@ -17,7 +18,7 @@ const nivelLabel: Record<number, string> = {
   3: 'Restringido',
 }
 
-const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500'
 
 export default function AdminClient({ usuarios: inicial, config: configInicial }: Props) {
   const [usuarios, setUsuarios] = useState<Usuario[]>(inicial)
@@ -154,10 +155,17 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
   }
 
   async function desactivarUsuario(u: Usuario) {
-    if (!window.confirm(`¿Desactivar a "${u.nombre}"? No podrá iniciar sesión hasta que sea reactivado.`)) return
+    const ok = await confirmar({
+      titulo: `¿Desactivar a ${u.nombre}?`,
+      mensaje: 'No podrá iniciar sesión hasta que sea reactivado.',
+      textoConfirmar: 'Desactivar',
+      peligro: true,
+    })
+    if (!ok) return
     const res = await fetch(`/api/admin/usuarios/${u.id}`, { method: 'DELETE' })
     const json = await res.json()
-    if (!res.ok) return alert(json.error ?? 'Error al desactivar usuario')
+    if (!res.ok) return aviso.error(json.error ?? 'Error al desactivar usuario')
+    aviso.exito(`${u.nombre} fue desactivado`)
     setUsuarios((prev) => prev.map((usr) => (usr.id === u.id ? json.data : usr)))
   }
 
@@ -174,7 +182,7 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
             key={t}
             onClick={() => setTab(t)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              tab === t ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+              tab === t ? 'bg-brand-600 text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
             }`}
           >
             {t === 'usuarios' ? <Users size={15} /> : t === 'config' ? <Settings size={15} /> : <History size={15} />}
@@ -191,7 +199,7 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
           <div className="flex justify-end">
             <button
               onClick={() => setModalUsuario(true)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
               <Plus size={16} />
               Nuevo usuario
@@ -219,7 +227,7 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
                     <td className="px-4 py-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                         Number(u.nivel) <= 1
-                          ? 'bg-blue-100 text-blue-700'
+                          ? 'bg-brand-100 text-brand-700'
                           : Number(u.nivel) === 2
                           ? 'bg-green-100 text-green-700'
                           : 'bg-gray-100 text-gray-600'
@@ -242,7 +250,7 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
                         <button
                           onClick={() => abrirEditUser(u)}
                           title="Editar usuario"
-                          className="p-1.5 rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          className="p-1.5 rounded-md text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                         >
                           <Pencil size={14} />
                         </button>
@@ -332,7 +340,7 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
                   type="checkbox"
                   checked={pagoMostrar}
                   onChange={(e) => setPagoMostrar(e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600"
+                  className="rounded border-gray-300 text-brand-600"
                 />
                 <span className="text-sm text-gray-700">Mostrar sección de pago en cotizaciones y reportes PDF</span>
               </label>
@@ -367,7 +375,7 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
             )}
             <button
               type="submit" disabled={savingConfig}
-              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 rounded-lg transition-colors"
             >
               {savingConfig ? 'Guardando...' : 'Guardar configuración'}
             </button>
@@ -410,7 +418,7 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
                 </select>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={nuevoUser.es_contador} onChange={(e) => setNuevoUser((u) => ({ ...u, es_contador: e.target.checked }))} className="rounded border-gray-300 text-blue-600" />
+                <input type="checkbox" checked={nuevoUser.es_contador} onChange={(e) => setNuevoUser((u) => ({ ...u, es_contador: e.target.checked }))} className="rounded border-gray-300 text-brand-600" />
                 <span className="text-sm text-gray-700">Es contador (recibe correos de factura, ve IVA)</span>
               </label>
               {userError && (
@@ -418,7 +426,7 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
               )}
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setModalUsuario(false)} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancelar</button>
-                <button type="submit" disabled={savingUser} className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-lg">{savingUser ? 'Creando...' : 'Crear usuario'}</button>
+                <button type="submit" disabled={savingUser} className="px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 rounded-lg">{savingUser ? 'Creando...' : 'Crear usuario'}</button>
               </div>
             </form>
           </div>
@@ -469,7 +477,7 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
                 <input
                   type="checkbox" checked={editUser.es_contador}
                   onChange={(e) => setEditUser((u) => ({ ...u, es_contador: e.target.checked }))}
-                  className="rounded border-gray-300 text-blue-600"
+                  className="rounded border-gray-300 text-brand-600"
                 />
                 <span className="text-sm text-gray-700">Es contador</span>
               </label>
@@ -488,7 +496,7 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
               )}
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setModalEditUser(null)} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancelar</button>
-                <button type="submit" disabled={savingEdit} className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-lg">{savingEdit ? 'Guardando...' : 'Guardar cambios'}</button>
+                <button type="submit" disabled={savingEdit} className="px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 rounded-lg">{savingEdit ? 'Guardando...' : 'Guardar cambios'}</button>
               </div>
             </form>
           </div>

@@ -5,6 +5,7 @@ import { Plus, Pencil, Trash2, ExternalLink, Eye, Mail, Loader2, X, PenLine, Bad
 import type { Reporte } from '@/types'
 import ReporteModal from './ReporteModal'
 import { borrar } from '@/lib/api-cliente'
+import { aviso, confirmar } from '@/components/ui/Avisos'
 
 export interface ClienteParaReporte {
   id: number
@@ -84,7 +85,7 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
   }).sort((a, b) => b.id - a.id)
 
   async function eliminar(id: number) {
-    if (!confirm('¿Eliminar este reporte?')) return
+    if (!(await confirmar({ titulo: '¿Eliminar este reporte?', mensaje: 'Esta acción no se puede deshacer.', peligro: true }))) return
     if (!(await borrar(`/api/reportes/${id}`, 'No se pudo eliminar el reporte'))) return
     setReportes((prev) => prev.filter((r) => r.id !== id))
     if (verDetalle?.id === id) setVerDetalle(null)
@@ -95,11 +96,11 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
     try {
       const res = await fetch(`/api/reportes/${r.id}/firma-link`)
       const json = await res.json()
-      if (!res.ok) return alert(json.error ?? 'No se pudo generar el enlace de firma')
+      if (!res.ok) return aviso.error(json.error ?? 'No se pudo generar el enlace de firma')
       const url = `${window.location.origin}/firma-cliente?id=${r.id}&t=${json.data.token}`
       setFirmaLink({ rep: r, url, copiado: false })
     } catch {
-      alert('Error de red. Intenta de nuevo.')
+      aviso.error('Error de red. Intenta de nuevo.')
     } finally {
       setGenerandoFirma(null)
     }
@@ -110,8 +111,9 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
     try {
       await navigator.clipboard.writeText(firmaLink.url)
       setFirmaLink({ ...firmaLink, copiado: true })
+      aviso.exito('Enlace copiado')
     } catch {
-      prompt('Copia el enlace:', firmaLink.url)
+      aviso.info('No se pudo copiar automáticamente: selecciona el enlace y cópialo')
     }
   }
 
@@ -193,6 +195,7 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
       return [reporte, ...prev]
     })
     setModal({ open: false, reporte: null })
+    aviso.exito(`Reporte ${reporte.folio} guardado`)
   }
 
   const puedeEditar  = nivel <= 2
@@ -209,7 +212,7 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
         {puedeEditar && (
           <button
             onClick={() => setModal({ open: true, reporte: null })}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             <Plus size={16} /> Nuevo reporte
           </button>
@@ -223,7 +226,7 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder="Buscar por folio, cliente o equipo..."
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 w-64"
         />
         {['', 'abierto', 'en_proceso', 'completado', 'entregado', 'cancelado'].map((e) => (
           <button
@@ -231,7 +234,7 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
             onClick={() => setFiltroEstado(e)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
               filtroEstado === e
-                ? 'bg-blue-600 text-white border-blue-600'
+                ? 'bg-brand-600 text-white border-brand-600'
                 : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
             }`}
           >
@@ -272,7 +275,7 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
               return (
                 <tr key={r.id} className={`${rowCls} border-b border-gray-100 hover:brightness-95 transition-all`}>
                   <td className="px-3 py-2.5">
-                    <span className="font-bold text-xs font-mono text-blue-700">{r.folio}</span>
+                    <span className="font-bold text-xs font-mono text-brand-700">{r.folio}</span>
                   </td>
                   <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">
                     {formatDate(r.fecha_ingreso)}
@@ -293,7 +296,7 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
                     <div className="flex items-center gap-1 justify-end">
                       <button
                         onClick={() => setVerDetalle(verDetalle?.id === r.id ? null : r)}
-                        className={`p-1.5 rounded-lg transition-colors ${verDetalle?.id === r.id ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'}`}
+                        className={`p-1.5 rounded-lg transition-colors ${verDetalle?.id === r.id ? 'text-brand-600 bg-brand-50' : 'text-gray-400 hover:text-brand-600 hover:bg-brand-50'}`}
                         title="Ver detalle"
                       >
                         <Eye size={13} />
@@ -334,7 +337,7 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
                       {puedeEditar && (
                         <button
                           onClick={() => setModal({ open: true, reporte: r })}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
                           title="Editar"
                         >
                           <Pencil size={13} />
@@ -372,7 +375,7 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-3">
-                    <span className="text-lg font-bold font-mono text-blue-700">{r.folio}</span>
+                    <span className="text-lg font-bold font-mono text-brand-700">{r.folio}</span>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${estadoConfig[r.estado] ?? ''}`}>
                       {r.estado.replace('_', ' ')}
                     </span>
@@ -484,7 +487,7 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
                     ) : (
                       <div className="space-y-1.5">
                         {mailState.contactos.map((c) => (
-                          <label key={c.email} className="flex items-start gap-2.5 p-2.5 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-colors">
+                          <label key={c.email} className="flex items-start gap-2.5 p-2.5 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer hover:bg-brand-50 hover:border-brand-200 transition-colors">
                             <input type="checkbox" checked={mailState.selected.has(c.email)} onChange={() => toggleEmail(c.email)} className="mt-0.5 rounded" />
                             <span>
                               <span className="text-sm font-medium text-gray-800">{c.nombre}</span>

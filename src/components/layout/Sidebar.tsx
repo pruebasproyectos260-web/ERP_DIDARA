@@ -1,103 +1,94 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import {
-  LayoutDashboard,
-  Users,
-  Package,
-  FileText,
-  Wrench,
-  Calendar,
-  TrendingUp,
-  Receipt,
-  Settings,
-  ClipboardList,
-  Monitor,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react'
-import { useState } from 'react'
-import type { NivelUsuario } from '@/types'
+import { ChevronsLeft, ChevronsRight, X } from 'lucide-react'
+import { gruposVisibles } from './navegacion'
 
-interface NavItem {
-  href: string
-  label: string
-  icon: React.ComponentType<{ className?: string }>
-  nivelMinimo: number   // nivel máximo de usuario que puede verlo (0=más privilegiado)
-  nivelMaximo?: number  // si nivel >= nivelMaximo, NO se muestra
+interface Props {
+  nivel: number
+  colapsado: boolean
+  onAlternarColapso: () => void
+  /** Modo panel deslizable en celular */
+  movil?: boolean
+  onCerrar?: () => void
 }
 
-const navItems: NavItem[] = [
-  { href: '/dashboard',    label: 'Dashboard',    icon: LayoutDashboard, nivelMinimo: 0, nivelMaximo: 3 },
-  { href: '/clientes',     label: 'Clientes',     icon: Users,           nivelMinimo: 0 },
-  { href: '/inventario',   label: 'Inventario',   icon: Package,         nivelMinimo: 0 },
-  { href: '/cotizaciones', label: 'Cotizaciones', icon: FileText,        nivelMinimo: 0 },
-  { href: '/reportes',     label: 'Reportes',     icon: Wrench,          nivelMinimo: 0 },
-  { href: '/agenda',       label: 'Agenda',       icon: Calendar,        nivelMinimo: 0 },
-  { href: '/pendientes',   label: 'Pendientes',   icon: ClipboardList,   nivelMinimo: 0 },
-  { href: '/software',     label: 'Software',     icon: Monitor,         nivelMinimo: 0 },
-  { href: '/ventas',       label: 'Ventas',       icon: TrendingUp,      nivelMinimo: 0, nivelMaximo: 3 },
-  { href: '/gastos',       label: 'Gastos',       icon: Receipt,         nivelMinimo: 0, nivelMaximo: 3 },
-  { href: '/admin',        label: 'Admin',        icon: Settings,        nivelMinimo: 0, nivelMaximo: 2 },
-]
-
-export default function Sidebar({ nivel }: { nivel: number }) {
+export default function Sidebar({ nivel, colapsado, onAlternarColapso, movil = false, onCerrar }: Props) {
   const pathname = usePathname()
-  const [collapsed, setCollapsed] = useState(true)
-
-  const itemsVisibles = navItems.filter((item) => {
-    if (item.nivelMaximo !== undefined && nivel >= item.nivelMaximo) return false
-    return true
-  })
+  const grupos = gruposVisibles(nivel)
+  const compacto = colapsado && !movil
 
   return (
     <aside
-      className={`flex flex-col bg-gray-900 text-white transition-all duration-300 ${
-        collapsed ? 'w-16' : 'w-56'
+      className={`relative flex h-full flex-col bg-gradient-to-b from-[#0b2928] to-[#071a19] text-white transition-[width] duration-300 ease-out ${
+        movil ? 'w-72' : compacto ? 'w-[76px]' : 'w-64'
       }`}
     >
-      {/* Logo */}
-      <div className="flex items-center justify-between px-4 py-5 border-b border-gray-700">
-        {!collapsed && (
-          <span className="font-bold text-lg tracking-tight text-white">
-            Didara<span className="text-blue-400">ERP</span>
-          </span>
+      {/* Marca */}
+      <div className={`flex h-16 shrink-0 items-center gap-3 border-b border-white/[0.07] ${compacto ? 'justify-center px-2' : 'px-5'}`}>
+        <Image src="/marca/simbolo.png" alt="" width={24} height={35}
+          className="h-8 w-auto shrink-0 brightness-0 invert" priority />
+        {!compacto && (
+          <div className="min-w-0 leading-none">
+            <p className="text-[15px] font-semibold tracking-tight">Didara TI</p>
+            <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.14em] text-brand-300/80">ERP</p>
+          </div>
         )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="ml-auto text-gray-400 hover:text-white transition-colors"
-        >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </button>
+        {movil && (
+          <button onClick={onCerrar} aria-label="Cerrar menú"
+            className="ml-auto rounded-lg p-2 text-white/60 hover:bg-white/10 hover:text-white">
+            <X size={18} />
+          </button>
+        )}
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 py-4 space-y-1 px-2">
-        {itemsVisibles.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + '/')
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                active
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              }`}
-              title={collapsed ? label : undefined}
-            >
-              <Icon className="w-5 h-5 shrink-0" />
-              {!collapsed && <span>{label}</span>}
-            </Link>
-          )
-        })}
+      {/* Navegación */}
+      <nav className={`flex-1 overflow-y-auto py-4 ${compacto ? 'px-2.5' : 'px-3'}`}>
+        {grupos.map((grupo) => (
+          <div key={grupo.titulo} className="mb-4 last:mb-0">
+            {compacto
+              ? <div className="mx-auto mb-2 h-px w-6 bg-white/10" />
+              : <p className="mb-1.5 px-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/35">{grupo.titulo}</p>}
+            <ul className="space-y-0.5">
+              {grupo.items.map(({ href, label, icon: Icon }) => {
+                const activo = pathname === href || pathname.startsWith(href + '/')
+                return (
+                  <li key={href}>
+                    <Link
+                      href={href}
+                      onClick={onCerrar}
+                      title={compacto ? label : undefined}
+                      aria-current={activo ? 'page' : undefined}
+                      className={`group relative flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors ${
+                        compacto ? 'justify-center px-0' : 'px-3'
+                      } ${activo
+                        ? 'bg-white/[0.09] text-white'
+                        : 'text-white/65 hover:bg-white/[0.05] hover:text-white'}`}
+                    >
+                      {activo && <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-r-full bg-brand-300" />}
+                      <Icon size={18} className={`shrink-0 ${activo ? 'text-brand-300' : 'text-white/55 group-hover:text-white/80'}`} />
+                      {!compacto && <span className="truncate">{label}</span>}
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
-      {/* Footer */}
-      {!collapsed && (
-        <div className="px-4 py-3 border-t border-gray-700 text-xs text-gray-500">
-          Didara TI © {new Date().getFullYear()}
+      {/* Pie: colapsar (solo escritorio) */}
+      {!movil && (
+        <div className="shrink-0 border-t border-white/[0.07] p-2.5">
+          <button
+            onClick={onAlternarColapso}
+            title={compacto ? 'Expandir menú' : 'Colapsar menú'}
+            className={`flex w-full items-center gap-3 rounded-lg py-2 text-sm text-white/50 transition-colors hover:bg-white/[0.05] hover:text-white ${compacto ? 'justify-center' : 'px-3'}`}
+          >
+            {compacto ? <ChevronsRight size={18} /> : <><ChevronsLeft size={18} /><span>Colapsar</span></>}
+          </button>
         </div>
       )}
     </aside>

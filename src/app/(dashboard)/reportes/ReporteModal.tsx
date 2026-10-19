@@ -5,6 +5,7 @@ import { X, Plus, Trash2, Upload, ImageOff } from 'lucide-react'
 import type { Reporte } from '@/types'
 import type { ClienteParaReporte, TecnicoParaReporte } from './ReportesClient'
 import { comprimirImagen } from '@/lib/comprimir-imagen'
+import { aviso } from '@/components/ui/Avisos'
 
 interface Props {
   reporte: Reporte | null
@@ -33,10 +34,10 @@ interface EvidenciaForm {
   uploading: boolean
 }
 
-const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500'
 const labelCls = 'block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1'
 const sectionCls = 'bg-white rounded-xl border border-gray-200 p-4 space-y-3'
-const sectionTitleCls = 'text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-2 mb-3'
+const sectionTitleCls = 'text-xs font-bold text-brand-700 uppercase tracking-wider flex items-center gap-2 mb-3'
 
 export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onGuardado }: Props) {
   const esNuevo = !reporte
@@ -178,7 +179,7 @@ export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onG
         if (!resp.ok) throw new Error(json.error)
         setEv((e) => ({ ...e, urls: [...e.urls, json.url] }))
       } catch (err) {
-        alert('Error al subir imagen: ' + (err instanceof Error ? err.message : String(err)))
+        aviso.error(`No se pudo subir ${original.name}: ${err instanceof Error ? err.message : String(err)}`)
       }
     }
     setEv((e) => ({ ...e, uploading: false }))
@@ -281,7 +282,7 @@ export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onG
                       <button
                         key={c.id}
                         type="button"
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-800"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-brand-50 text-gray-800"
                         onMouseDown={() => {
                           setClienteId(String(c.id))
                           setClienteQuery(c.nombre)
@@ -336,7 +337,7 @@ export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onG
                     type="checkbox"
                     checked={tipos.includes(t)}
                     onChange={() => toggleTipo(t)}
-                    className="rounded border-gray-300 text-blue-600 w-4 h-4"
+                    className="rounded border-gray-300 text-brand-600 w-4 h-4"
                   />
                   <span className="text-sm text-gray-700">{t}</span>
                 </label>
@@ -392,7 +393,7 @@ export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onG
               <button
                 type="button"
                 onClick={() => setTrabajos((prev) => [...prev, ''])}
-                className="w-full flex items-center justify-center gap-2 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 <Plus size={14} /> Agregar trabajo
               </button>
@@ -414,18 +415,18 @@ export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onG
                   <div className="col-span-2">
                     <input type="number" min="1" step="1" value={m.cantidad}
                       onChange={(e) => setMateriales((prev) => { const a = [...prev]; a[i] = { ...a[i], cantidad: parseInt(e.target.value) || 1 }; return a })}
-                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   </div>
                   <div className="col-span-7">
                     <input type="text" value={m.descripcion}
                       onChange={(e) => setMateriales((prev) => { const a = [...prev]; a[i] = { ...a[i], descripcion: e.target.value }; return a })}
                       placeholder="Descripción"
-                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   </div>
                   <div className="col-span-2">
                     <input type="number" min="0" step="0.01" value={m.costo}
                       onChange={(e) => setMateriales((prev) => { const a = [...prev]; a[i] = { ...a[i], costo: parseFloat(e.target.value) || 0 }; return a })}
-                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   </div>
                   <div className="flex justify-center">
                     {materiales.length > 1 && (
@@ -438,7 +439,7 @@ export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onG
               <button
                 type="button"
                 onClick={() => setMateriales((prev) => [...prev, { descripcion: '', cantidad: 1, costo: 0 }])}
-                className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                className="flex items-center gap-1 text-sm text-brand-600 hover:text-brand-800 font-medium"
               >
                 <Plus size={14} /> Agregar material
               </button>
@@ -456,7 +457,7 @@ export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onG
                   onChange={async (e) => { await uploadFotos(Array.from(e.target.files ?? []), 'antes', setEvAntes); e.target.value = '' }} />
                 <button type="button" onClick={() => fileBeforeRef.current?.click()}
                   disabled={evAntes.uploading}
-                  className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-lg text-sm text-gray-500 hover:text-blue-600 transition-colors disabled:opacity-50">
+                  className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-gray-300 hover:border-brand-400 rounded-lg text-sm text-gray-500 hover:text-brand-600 transition-colors disabled:opacity-50">
                   <Upload size={14} /> {evAntes.uploading ? 'Subiendo...' : 'Elegir archivos'}
                 </button>
                 {evAntes.urls.length > 0 ? (
@@ -484,7 +485,7 @@ export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onG
                   onChange={async (e) => { await uploadFotos(Array.from(e.target.files ?? []), 'despues', setEvDespues); e.target.value = '' }} />
                 <button type="button" onClick={() => fileAfterRef.current?.click()}
                   disabled={evDespues.uploading}
-                  className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-lg text-sm text-gray-500 hover:text-blue-600 transition-colors disabled:opacity-50">
+                  className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-gray-300 hover:border-brand-400 rounded-lg text-sm text-gray-500 hover:text-brand-600 transition-colors disabled:opacity-50">
                   <Upload size={14} /> {evDespues.uploading ? 'Subiendo...' : 'Elegir archivos'}
                 </button>
                 {evDespues.urls.length > 0 ? (
@@ -542,7 +543,7 @@ export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onG
                   step="0.01"
                   value={costoTotal}
                   onChange={(e) => setCostoTotal(parseFloat(e.target.value) || 0)}
-                  className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-2 text-sm text-right font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-2 text-sm text-right font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
             </div>
@@ -563,7 +564,7 @@ export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onG
             type="submit"
             form="reporte-form"
             disabled={loading || anyUploading}
-            className="flex items-center gap-2 px-5 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-lg transition-colors font-medium"
+            className="flex items-center gap-2 px-5 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 rounded-lg transition-colors font-medium"
           >
             {loading ? 'Guardando...' : '💾 Guardar'}
           </button>

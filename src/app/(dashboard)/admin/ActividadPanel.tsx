@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Download, History, Loader2, RefreshCw } from 'lucide-react'
+import { aviso } from '@/components/ui/Avisos'
 
 interface Registro {
   id: number
@@ -33,7 +34,7 @@ const ETIQUETA_TABLA = Object.fromEntries(TABLAS.filter((t) => t.valor).map((t) 
 
 const ACCIONES: Record<string, { label: string; cls: string }> = {
   crear:              { label: 'Creó',            cls: 'bg-green-100 text-green-700' },
-  editar:             { label: 'Editó',           cls: 'bg-blue-100 text-blue-700' },
+  editar:             { label: 'Editó',           cls: 'bg-brand-100 text-brand-700' },
   eliminar:           { label: 'Eliminó',         cls: 'bg-red-100 text-red-700' },
   cambiar_estado:     { label: 'Cambió estado',   cls: 'bg-amber-100 text-amber-800' },
   firmar:             { label: 'Firmó',           cls: 'bg-purple-100 text-purple-700' },
@@ -90,9 +91,10 @@ export default function ActividadPanel() {
       a.download = `respaldo-didara-${new Date().toISOString().slice(0, 10)}.json`
       a.click()
       URL.revokeObjectURL(url)
+      aviso.exito('Respaldo descargado')
       recargar()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'No se pudo generar el respaldo')
+      aviso.error(err instanceof Error ? err.message : 'No se pudo generar el respaldo')
     } finally {
       setDescargando(false)
     }

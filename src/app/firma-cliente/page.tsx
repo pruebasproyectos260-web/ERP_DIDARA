@@ -144,7 +144,7 @@ function FirmaForm() {
         {/* Header */}
         <div className="px-6 py-5 border-b border-gray-200 text-center">
           <h1 className="text-xl font-bold text-gray-900">
-            Didara<span className="text-blue-500">TI</span>
+            Didara<span className="text-brand-500">TI</span>
           </h1>
           <p className="text-sm text-gray-500 mt-1">Firma de conformidad</p>
         </div>
@@ -202,7 +202,7 @@ function FirmaForm() {
           <button
             onClick={enviar}
             disabled={enviando || vacio}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium py-3 rounded-xl text-sm transition-colors"
+            className="w-full bg-brand-600 hover:bg-brand-700 disabled:bg-brand-300 text-white font-medium py-3 rounded-xl text-sm transition-colors"
           >
             {enviando ? 'Enviando...' : 'Confirmar recepción'}
           </button>

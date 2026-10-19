@@ -44,7 +44,7 @@ export default function AgendaAlert({ userId }: { userId: string }) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <Calendar size={18} className="text-blue-500" />
+            <Calendar size={18} className="text-brand-500" />
             <h2 className="text-base font-semibold text-gray-900">Eventos próximos (7 días)</h2>
           </div>
           <button onClick={cerrar} className="text-gray-400 hover:text-gray-600">
@@ -69,11 +69,11 @@ export default function AgendaAlert({ userId }: { userId: string }) {
               return (
                 <div
                   key={ev.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-blue-50 border border-blue-200"
+                  className="flex items-center justify-between p-3 rounded-lg bg-brand-50 border border-brand-200"
                 >
                   <div>
                     <p className="text-sm font-semibold text-gray-900">{ev.titulo}</p>
-                    <p className="text-xs text-blue-700 mt-0.5">
+                    <p className="text-xs text-brand-700 mt-0.5">
                       {diasRestantes === 0
                         ? 'Hoy'
                         : diasRestantes === 1
@@ -95,7 +95,7 @@ export default function AgendaAlert({ userId }: { userId: string }) {
         <div className="px-5 pb-4 flex justify-end">
           <button
             onClick={cerrar}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-white bg-brand-500 hover:bg-brand-600 rounded-lg transition-colors"
           >
             Entendido
           </button>
