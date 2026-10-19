@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, ArrowUpDown, Users, Phone, Mail, MapPin } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, ArrowUpDown, Users, Phone, Mail, MapPin, LifeBuoy } from 'lucide-react'
+import PortalCliente from '@/components/ui/PortalCliente'
 import type { Cliente } from '@/types'
 import { borrar } from '@/lib/api-cliente'
 import ClienteModal from './ClienteModal'
@@ -22,6 +23,7 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
   const [modal, setModal] = useState<{ open: boolean; cliente: Cliente | null }>({ open: false, cliente: null })
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
   const [orden, setOrden] = useState<Orden>('id_asc')
+  const [portalDe, setPortalDe] = useState<Cliente | null>(null)
 
   const filtrados = useMemo(() => {
     const q = busqueda.toLowerCase()
@@ -69,7 +71,7 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
   const puedeEliminar  = nivel <= 1
   const verDescuento   = nivel <= 1
   const verFiscal      = nivel <= 1 || esContador
-  const gridTemplate = ['3rem', '1fr', verDescuento && '5.5rem', verFiscal && '7rem', verFiscal && '5rem', '14rem', '5rem'].filter(Boolean).join(' ')
+  const gridTemplate = ['3rem', '1fr', verDescuento && '5.5rem', verFiscal && '7rem', verFiscal && '5rem', '14rem', '7.5rem'].filter(Boolean).join(' ')
 
   const ordenOpciones: { value: Orden; label: string }[] = [
     { value: 'id_asc',    label: 'ID ↑' },
@@ -108,7 +110,8 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
         {filtrados.map((cliente) => (
           <TarjetaCliente key={cliente.id} cliente={cliente} verDescuento={verDescuento} verFiscal={verFiscal}
             puedeEditar={puedeEditar} puedeEliminar={puedeEliminar}
-            onEditar={() => setModal({ open: true, cliente })} onEliminar={() => eliminar(cliente.id)} />
+            onEditar={() => setModal({ open: true, cliente })} onEliminar={() => eliminar(cliente.id)}
+            onPortal={() => setPortalDe(cliente)} />
         ))}
       </div>
 
@@ -248,6 +251,11 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
                 {/* Acciones */}
                 <div className="-mt-1 flex items-center justify-end gap-0.5">
                   {puedeEditar && (
+                    <BotonIcono titulo="Portal de soporte" tono="marca" onClick={() => setPortalDe(cliente)}>
+                      <LifeBuoy size={15} />
+                    </BotonIcono>
+                  )}
+                  {puedeEditar && (
                     <BotonIcono titulo="Editar" tono="marca" onClick={() => setModal({ open: true, cliente })}>
                       <Pencil size={15} />
                     </BotonIcono>
@@ -271,13 +279,18 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
           onGuardado={onGuardado}
         />
       )}
+
+      {portalDe && (
+        <PortalCliente clienteId={portalDe.id} onCerrar={() => setPortalDe(null)}
+          emailSugerido={portalDe.email || portalDe.contactos?.find((c) => c.email)?.email || null} />
+      )}
     </div>
   )
 }
 
 // ── Tarjeta para celular ──────────────────────────────────────────────────
 
-function TarjetaCliente({ cliente, verDescuento, verFiscal, puedeEditar, puedeEliminar, onEditar, onEliminar }: {
+function TarjetaCliente({ cliente, verDescuento, verFiscal, puedeEditar, puedeEliminar, onEditar, onEliminar, onPortal }: {
   cliente: Cliente
   verDescuento: boolean
   verFiscal: boolean
@@ -285,6 +298,7 @@ function TarjetaCliente({ cliente, verDescuento, verFiscal, puedeEditar, puedeEl
   puedeEliminar: boolean
   onEditar: () => void
   onEliminar: () => void
+  onPortal: () => void
 }) {
   const dirs = cliente.direcciones?.length > 0
     ? cliente.direcciones
@@ -326,6 +340,7 @@ function TarjetaCliente({ cliente, verDescuento, verFiscal, puedeEditar, puedeEl
         </div>
         {(puedeEditar || puedeEliminar) && (
           <div className="-mr-2 -mt-1 flex shrink-0">
+            {puedeEditar && <BotonIcono titulo="Portal de soporte" tono="marca" onClick={onPortal}><LifeBuoy size={16} /></BotonIcono>}
             {puedeEditar && <BotonIcono titulo="Editar" tono="marca" onClick={onEditar}><Pencil size={16} /></BotonIcono>}
             {puedeEliminar && <BotonIcono titulo="Eliminar" tono="peligro" onClick={onEliminar}><Trash2 size={16} /></BotonIcono>}
           </div>

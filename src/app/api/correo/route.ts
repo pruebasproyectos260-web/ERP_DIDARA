@@ -5,12 +5,13 @@ import { leerJson } from '@/lib/campos'
 import { escaparHtml, escaparMultilinea } from '@/lib/html'
 import { urlFirma } from '@/lib/firma'
 import { enviarCorreo } from '@/lib/correo'
+import { CORREO_DIRECCION, plantillaCorreo } from '@/lib/plantilla-correo'
 import { generarPDFCotizacion } from '@/lib/pdf-cotizacion'
 import { generarPDFReporte } from '@/lib/pdf-reporte'
 import { datosPDFCotizacion, datosPDFReporte, precioUnitarioCliente } from '@/lib/pdf-datos'
 
-const CC_FIJO = 'direccion@didara-ti.com'
-const AÑO = new Date().getFullYear()
+const CC_FIJO = CORREO_DIRECCION
+const emailLayout = plantillaCorreo
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return ''
@@ -21,30 +22,6 @@ function fmtDate(d: string | null | undefined) {
 
 function fmt$(n: number) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
-}
-
-function emailLayout(titulo: string, subtitulo: string, contenido: string) {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:20px;background:#f1f5f9;font-family:Arial,sans-serif;">
-<div style="max-width:640px;margin:0 auto;">
-  <div style="background:#137D79;color:#fff;padding:22px 28px;border-radius:10px 10px 0 0;">
-    <h2 style="margin:0;font-size:1.25rem;font-weight:800;">${titulo}</h2>
-    <p style="margin:6px 0 0;opacity:.85;font-size:.85rem;">${subtitulo}</p>
-  </div>
-  <div style="background:#ffffff;padding:26px 28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;">
-    ${contenido}
-    <hr style="margin:24px 0;border:none;border-top:1px solid #f1f5f9;">
-    <p style="margin:0;font-size:.78rem;color:#94a3b8;text-align:center;">
-      Este mensaje fue enviado automáticamente por el sistema ERP de <strong>Didara TI</strong>.<br>
-      Si tienes dudas, responde este correo o escríbenos a
-      <a href="mailto:direccion@didara-ti.com" style="color:#137D79;">direccion@didara-ti.com</a>
-    </p>
-  </div>
-  <p style="text-align:center;font-size:.72rem;color:#94a3b8;margin-top:12px;">
-    © ${AÑO} Didara TI &nbsp;·&nbsp; didarobot@didara-ti.com
-  </p>
-</div>
-</body></html>`
 }
 
 export async function POST(req: NextRequest) {

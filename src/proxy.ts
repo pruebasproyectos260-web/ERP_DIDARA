@@ -60,7 +60,7 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // /api/firma/ valida su propio token de enlace (ver src/lib/firma.ts)
-  const publicPaths = ['/login', '/firma-cliente', '/api/firma/']
+  const publicPaths = ['/login', '/firma-cliente', '/api/firma/', '/soporte', '/api/soporte']
   const isPublic = publicPaths.some((p) => pathname.startsWith(p))
 
   if (!user && !isPublic) {
@@ -83,6 +83,7 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // sw.js y el manifiesto los pide el navegador sin sesión (avisos push / app instalada)
+    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

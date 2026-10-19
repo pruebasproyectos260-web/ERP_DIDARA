@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, Pencil, Trash2, ExternalLink, Eye, Mail, Loader2, X, BadgeCheck, Copy, Check, MessageCircle, Wrench, Signature } from 'lucide-react'
 import type { Reporte } from '@/types'
 import ReporteModal from './ReporteModal'
@@ -25,6 +26,8 @@ interface Props {
   clientes: ClienteParaReporte[]
   tecnicos: TecnicoParaReporte[]
   nivel: number
+  /** Ticket de la mesa de ayuda desde el que se crea un reporte (/reportes?ticket=ID) */
+  ticketOrigen?: { id: number; folio: string; cliente_id: number; asunto: string; descripcion: string } | null
 }
 
 const estadoConfig: Record<string, string> = {
@@ -76,11 +79,14 @@ interface MailRepState {
   ok: boolean
 }
 
-export default function ReportesClient({ reportes: inicial, clientes, tecnicos, nivel }: Props) {
+export default function ReportesClient({ reportes: inicial, clientes, tecnicos, nivel, ticketOrigen = null }: Props) {
+  const router = useRouter()
   const [reportes, setReportes] = useState<Reporte[]>(inicial)
+  // Si se llegó desde un ticket (/reportes?ticket=ID), el formulario abre ya precargado
   const [modal, setModal] = useState<{ open: boolean; reporte: Reporte | null }>({
-    open: false, reporte: null,
+    open: !!ticketOrigen, reporte: null,
   })
+  const [ticketPendiente, setTicketPendiente] = useState(ticketOrigen)
   const [filtroEstado, setFiltroEstado] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [verDetalle, setVerDetalle] = useState<Reporte | null>(null)
@@ -209,6 +215,31 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
     })
     setModal({ open: false, reporte: null })
     aviso.exito(`Reporte ${reporte.folio} guardado`)
+
+    // Reporte creado desde un ticket: se liga al ticket y el ticket pasa a "en proceso"
+    if (ticketPendiente) {
+      const ticket = ticketPendiente
+      setTicketPendiente(null)
+      fetch(`/api/tickets/${ticket.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reporte_id: reporte.id, estado: 'en_proceso' }),
+      })
+        .then((r) => {
+          if (r.ok) aviso.info(`Ligado al ticket ${ticket.folio}`)
+          else aviso.error(`El reporte se guardó, pero no se pudo ligar al ticket ${ticket.folio}`)
+        })
+        .catch(() => aviso.error(`El reporte se guardó, pero no se pudo ligar al ticket ${ticket.folio}`))
+      router.replace('/reportes')
+    }
+  }
+
+  function cerrarModal() {
+    setModal({ open: false, reporte: null })
+    if (ticketPendiente) {
+      setTicketPendiente(null)
+      router.replace('/reportes')
+    }
   }
 
   const puedeEditar  = nivel <= 2
@@ -606,8 +637,12 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
           reporte={modal.reporte}
           clientes={clientes}
           tecnicos={tecnicos}
-          onClose={() => setModal({ open: false, reporte: null })}
+          onClose={cerrarModal}
           onGuardado={onGuardado}
+          iniciales={!modal.reporte && ticketPendiente ? {
+            cliente_id: ticketPendiente.cliente_id,
+            falla_reportada: `${ticketPendiente.asunto}\n${ticketPendiente.descripcion}\n(Ticket ${ticketPendiente.folio})`,
+          } : undefined}
         />
       )}
     </div>

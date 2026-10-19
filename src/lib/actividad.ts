@@ -9,7 +9,8 @@ export type Accion =
   | 'desactivar' | 'cambiar_contrasena' | 'respaldo'
 
 export async function registrarActividad(
-  sesion: Pick<Sesion, 'userId' | 'nombre'> | null,
+  // userId null = acción de un cliente desde un enlace público (firma, portal de soporte)
+  sesion: Pick<Sesion, 'nombre'> & { userId: string | null } | null,
   accion: Accion,
   tabla: string,
   registroId: string | number | null | undefined,

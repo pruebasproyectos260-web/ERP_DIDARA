@@ -9,6 +9,12 @@ interface OpcionesCorreo {
 }
 
 export async function enviarCorreo({ para, cc, asunto, html, adjuntos }: OpcionesCorreo) {
+  // Pruebas locales: no enviar correos reales (nunca se define en producción)
+  if (process.env.CORREO_DESACTIVADO === '1') {
+    console.log(`[correo desactivado] "${asunto}" → ${[para].flat().join(', ')}`)
+    return
+  }
+
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) throw new Error('RESEND_API_KEY no configurada')
 

@@ -8,6 +8,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js'
 import CambiarContrasenaModal from './CambiarContrasenaModal'
 import { itemActivo } from './navegacion'
 import { alternarTema, useTemaOscuro } from '@/lib/tema'
+import { olvidarDispositivo } from '@/lib/push-cliente'
 
 interface Props {
   user: SupabaseUser
@@ -51,6 +52,8 @@ export default function Header({ user, perfil, esContador, onAbrirMenu }: Props)
   }, [open])
 
   async function cerrarSesion() {
+    // Este dispositivo deja de recibir los avisos de esta cuenta (máx. 2 s de espera)
+    await Promise.race([olvidarDispositivo(), new Promise((r) => setTimeout(r, 2000))])
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/login')

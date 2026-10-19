@@ -1,10 +1,14 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import ReportesClient from './ReportesClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function ReportesPage() {
+export default async function ReportesPage({ searchParams }: { searchParams: Promise<{ ticket?: string }> }) {
+  const { ticket: ticketParam } = await searchParams
   const supabase = await createClient()
+  // La política RLS de `usuarios` solo deja ver el propio registro a quien no es admin:
+  // la lista de técnicos (id y nombre) se lee con service role tras validar la sesión.
+  const servicio = createServiceClient()
 
   const [
     { data: reportes },
@@ -18,7 +22,7 @@ export default async function ReportesPage() {
       .select('*, cliente:clientes(id, nombre), items:reporte_items(*)')
       .order('created_at', { ascending: false }),
     supabase.from('clientes').select('id, nombre, direccion, direcciones').eq('activo', true).order('nombre'),
-    supabase.from('usuarios').select('id, nombre').eq('activo', true).order('nombre'),
+    servicio.from('usuarios').select('id, nombre').eq('activo', true).order('nombre'),
     supabase.auth.getUser(),
   ])
 
@@ -35,12 +39,22 @@ export default async function ReportesPage() {
     .eq('id', user!.id)
     .single()
 
+  // Reporte que se crea desde un ticket de la mesa de ayuda (/reportes?ticket=ID)
+  let ticketOrigen = null
+  if (ticketParam && (perfil?.nivel ?? 3) <= 2) {
+    const { data } = await servicio
+      .from('tickets').select('id, folio, cliente_id, asunto, descripcion, reporte_id')
+      .eq('id', Number(ticketParam)).single()
+    if (data && data.cliente_id && !data.reporte_id) ticketOrigen = data
+  }
+
   return (
     <ReportesClient
       reportes={reportesConTecnico as never}
       clientes={clientes ?? []}
       tecnicos={tecnicos ?? []}
       nivel={perfil?.nivel ?? 2}
+      ticketOrigen={ticketOrigen}
     />
   )
 }

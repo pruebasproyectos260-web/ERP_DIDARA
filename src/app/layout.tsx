@@ -8,6 +8,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: { default: "Didara ERP", template: "%s · Didara ERP" },
   description: "Sistema de gestión Didara TI",
+  appleWebApp: { capable: true, title: "Didara ERP", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

@@ -13,6 +13,8 @@ interface Props {
   tecnicos: TecnicoParaReporte[]
   onClose: () => void
   onGuardado: (reporte: Reporte) => void
+  /** Datos precargados para un reporte nuevo (p. ej. creado desde un ticket) */
+  iniciales?: { cliente_id?: number; falla_reportada?: string }
 }
 
 const TIPOS_SERVICIO = [
@@ -39,7 +41,7 @@ const labelCls = 'block text-xs font-semibold text-gray-500 uppercase tracking-w
 const sectionCls = 'bg-white rounded-xl border border-gray-200 p-4 space-y-3'
 const sectionTitleCls = 'text-xs font-bold text-brand-700 uppercase tracking-wider flex items-center gap-2 mb-3'
 
-export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onGuardado }: Props) {
+export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onGuardado, iniciales }: Props) {
   const esNuevo = !reporte
   // Carpeta en Storage: ID del reporte si existe, UUID nuevo si es creación
   const [sesion] = useState<string>(() =>
@@ -48,9 +50,11 @@ export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onG
 
   // ── Cliente con búsqueda ─────────────────────────────────────
   const [clienteQuery, setClienteQuery] = useState(
-    reporte ? (reporte.cliente as { nombre?: string } | undefined)?.nombre ?? '' : ''
+    reporte
+      ? (reporte.cliente as { nombre?: string } | undefined)?.nombre ?? ''
+      : clientes.find((c) => c.id === iniciales?.cliente_id)?.nombre ?? ''
   )
-  const [clienteId, setClienteId] = useState(reporte?.cliente_id?.toString() ?? '')
+  const [clienteId, setClienteId] = useState(reporte?.cliente_id?.toString() ?? iniciales?.cliente_id?.toString() ?? '')
   const [showClienteDrop, setShowClienteDrop] = useState(false)
   const clientesFiltrados = clienteQuery.length >= 1
     ? clientes.filter((c) => c.nombre.toLowerCase().includes(clienteQuery.toLowerCase())).slice(0, 8)
@@ -88,7 +92,7 @@ export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onG
   }
 
   // ── Diagnóstico ──────────────────────────────────────────────
-  const [fallaReportada, setFallaReportada] = useState(reporte?.falla_reportada ?? '')
+  const [fallaReportada, setFallaReportada] = useState(reporte?.falla_reportada ?? iniciales?.falla_reportada ?? '')
   const [diagnostico,    setDiagnostico]    = useState(reporte?.diagnostico ?? '')
 
   // ── Trabajos realizados (cada uno es un textarea) ─────────────

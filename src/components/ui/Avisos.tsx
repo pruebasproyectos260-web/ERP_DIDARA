@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useSyncExternalStore } from 'react'
-import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react'
+import { AlertTriangle, BellRing, CheckCircle2, Info, X, XCircle } from 'lucide-react'
 
 // Avisos (toasts) y confirmaciones con el estilo del ERP, en lugar de alert()/confirm().
 // Se pueden llamar desde cualquier lado (componentes o helpers):
@@ -9,8 +9,9 @@ import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react'
 //   if (!(await confirmar({ titulo: '¿Eliminar?', peligro: true }))) return
 // <Avisos /> se monta una sola vez en el layout raíz.
 
-type Tipo = 'exito' | 'error' | 'info'
-interface Toast { id: number; tipo: Tipo; mensaje: string }
+type Tipo = 'exito' | 'error' | 'info' | 'notificacion' | 'urgente'
+interface Accion { texto: string; alHacer: () => void }
+interface Toast { id: number; tipo: Tipo; mensaje: string; titulo?: string; accion?: Accion }
 interface Confirmacion {
   titulo: string
   mensaje?: string
@@ -36,17 +37,22 @@ function quitar(id: number) {
   emitir()
 }
 
-function mostrar(tipo: Tipo, mensaje: string) {
+const DURACION: Record<Tipo, number> = { exito: 3500, info: 3500, error: 6000, notificacion: 9000, urgente: 15000 }
+
+function mostrar(tipo: Tipo, mensaje: string, extra?: Pick<Toast, 'titulo' | 'accion'>) {
   const id = siguienteId++
-  toasts = [...toasts.slice(-3), { id, tipo, mensaje }] // máximo 4 a la vez
+  toasts = [...toasts.slice(-3), { id, tipo, mensaje, ...extra }] // máximo 4 a la vez
   emitir()
-  setTimeout(() => quitar(id), tipo === 'error' ? 6000 : 3500)
+  setTimeout(() => quitar(id), DURACION[tipo])
 }
 
 export const aviso = {
   exito: (mensaje: string) => mostrar('exito', mensaje),
   error: (mensaje: string) => mostrar('error', mensaje),
   info: (mensaje: string) => mostrar('info', mensaje),
+  /** Algo nuevo que atender (p. ej. un ticket): con título, botón de acción y más tiempo en pantalla */
+  notificacion: ({ titulo, mensaje, urgente, accion }: { titulo: string; mensaje: string; urgente?: boolean; accion?: Accion }) =>
+    mostrar(urgente ? 'urgente' : 'notificacion', mensaje, { titulo, accion }),
 }
 
 export function confirmar(opciones: Omit<Confirmacion, 'resolver'>): Promise<boolean> {
@@ -72,6 +78,8 @@ const ESTILO: Record<Tipo, { icono: typeof Info; cls: string }> = {
   exito: { icono: CheckCircle2, cls: 'text-emerald-600 dark:text-emerald-400' },
   error: { icono: XCircle, cls: 'text-red-600 dark:text-red-400' },
   info: { icono: Info, cls: 'text-brand-600 dark:text-brand-300' },
+  notificacion: { icono: BellRing, cls: 'text-brand-600 dark:text-brand-300' },
+  urgente: { icono: BellRing, cls: 'text-red-600 dark:text-red-400' },
 }
 
 export default function Avisos() {
@@ -99,11 +107,21 @@ export default function Avisos() {
           return (
             <div
               key={t.id}
-              role={t.tipo === 'error' ? 'alert' : 'status'}
-              className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border border-black/5 bg-[var(--surface)] px-4 py-3 text-sm text-[var(--text)] shadow-lg shadow-black/10 animate-subir dark:border-white/10"
+              role={t.tipo === 'error' || t.tipo === 'urgente' ? 'alert' : 'status'}
+              className={`pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border bg-[var(--surface)] px-4 py-3 text-sm text-[var(--text)] shadow-lg shadow-black/10 animate-subir ${
+                t.tipo === 'urgente' ? 'border-red-200 dark:border-red-500/40' : 'border-black/5 dark:border-white/10'}`}
             >
               <Icono size={18} className={`mt-0.5 shrink-0 ${cls}`} />
-              <p className="flex-1 leading-snug">{t.mensaje}</p>
+              <div className="min-w-0 flex-1">
+                {t.titulo && <p className="font-semibold leading-snug">{t.titulo}</p>}
+                <p className={`leading-snug ${t.titulo ? 'mt-0.5 line-clamp-2 text-[var(--text-muted)]' : ''}`}>{t.mensaje}</p>
+                {t.accion && (
+                  <button onClick={() => { t.accion!.alHacer(); quitar(t.id) }}
+                    className={`mt-2 text-xs font-semibold hover:underline ${cls}`}>
+                    {t.accion.texto}
+                  </button>
+                )}
+              </div>
               <button onClick={() => quitar(t.id)} aria-label="Cerrar aviso"
                 className="-mr-1 rounded p-0.5 text-[var(--text-muted)] hover:text-[var(--text)]">
                 <X size={15} />

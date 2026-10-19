@@ -13,9 +13,10 @@ interface Props {
   /** Modo panel deslizable en celular */
   movil?: boolean
   onCerrar?: () => void
+  contadores?: Record<string, number>
 }
 
-export default function Sidebar({ nivel, colapsado, onAlternarColapso, movil = false, onCerrar }: Props) {
+export default function Sidebar({ nivel, colapsado, onAlternarColapso, movil = false, onCerrar, contadores = {} }: Props) {
   const pathname = usePathname()
   const grupos = gruposVisibles(nivel)
   const compacto = colapsado && !movil
@@ -59,7 +60,7 @@ export default function Sidebar({ nivel, colapsado, onAlternarColapso, movil = f
                     <Link
                       href={href}
                       onClick={onCerrar}
-                      title={compacto ? label : undefined}
+                      title={compacto ? `${label}${contadores[href] ? ` (${contadores[href]})` : ''}` : undefined}
                       aria-current={activo ? 'page' : undefined}
                       className={`group relative flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors ${
                         compacto ? 'justify-center px-0' : 'px-3'
@@ -70,6 +71,9 @@ export default function Sidebar({ nivel, colapsado, onAlternarColapso, movil = f
                       {activo && <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-r-full bg-brand-300" />}
                       <Icon size={18} className={`shrink-0 ${activo ? 'text-brand-300' : 'text-white/55 group-hover:text-white/80'}`} />
                       {!compacto && <span className="truncate">{label}</span>}
+                      {(contadores[href] ?? 0) > 0 && (compacto
+                        ? <span className="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-amber-400" />
+                        : <span className="ml-auto rounded-full bg-amber-400/90 px-1.5 py-px text-[11px] font-semibold text-[#0b2928]">{contadores[href]}</span>)}
                     </Link>
                   </li>
                 )

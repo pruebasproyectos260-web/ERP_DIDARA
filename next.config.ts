@@ -22,6 +22,11 @@ const nextConfig: NextConfig = {
           ] : []),
         ],
       },
+      {
+        // El service worker de avisos siempre se revisa fresco para que las mejoras lleguen enseguida
+        source: '/sw.js',
+        headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }],
+      },
     ]
   },
 };

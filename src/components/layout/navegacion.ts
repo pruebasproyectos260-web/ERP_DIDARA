@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, Package, FileText, Wrench, Calendar,
-  TrendingUp, Receipt, Settings, ClipboardList, Monitor,
+  TrendingUp, Receipt, Settings, ClipboardList, Monitor, LifeBuoy,
 } from 'lucide-react'
 
 export interface ItemNav {
@@ -19,6 +19,7 @@ export const GRUPOS_NAV: GrupoNav[] = [
   ] },
   { titulo: 'Operación', items: [
     { href: '/clientes',     label: 'Clientes',     icon: Users },
+    { href: '/tickets',      label: 'Mesa de ayuda', icon: LifeBuoy },
     { href: '/cotizaciones', label: 'Cotizaciones', icon: FileText },
     { href: '/reportes',     label: 'Reportes',     icon: Wrench },
     { href: '/agenda',       label: 'Agenda',       icon: Calendar },
