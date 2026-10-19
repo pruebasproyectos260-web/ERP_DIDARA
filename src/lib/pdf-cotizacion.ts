@@ -1,5 +1,6 @@
-import puppeteer from 'puppeteer-core'
 import { escaparHtml as e, escaparMultilinea } from './html'
+import { conPagina } from './navegador'
+import { imagenParaPDF } from './imagenes-pdf'
 
 export interface ItemPDF {
   descripcion: string
@@ -57,8 +58,7 @@ const DEFAULT_EMPRESA: EmpresaPDF = {
   web:       'www.didara-ti.com',
 }
 
-function htmlCotizacion(d: DatosCotizacionPDF): string {
-  const logoSrc = LOGO_URL
+function htmlCotizacion(d: DatosCotizacionPDF, logoSrc: string): string {
   const emp = d.empresa ?? DEFAULT_EMPRESA
 
   const filas = d.items.map((item) => `
@@ -239,44 +239,22 @@ ${logoSrc ? `<div class="watermark"></div>` : ''}
 </html>`
 }
 
-// ─── Puppeteer: detecta entorno automáticamente ───────────────
-
-async function abrirBrowser() {
-  // Cloud sin Chrome instalado: Render, Vercel, AWS Lambda → usa @sparticuz/chromium
-  if (process.env.RENDER || process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
-    const chromium = (await import('@sparticuz/chromium')).default
-    return puppeteer.launch({
-      args: [...chromium.args, '--disable-dev-shm-usage'],
-      defaultViewport: { width: 1280, height: 900 },
-      executablePath: await chromium.executablePath(),
-      headless: true,
-    })
-  }
-
-  // Desarrollo local
-  const executablePath =
-    process.platform === 'win32'
-      ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-      : process.platform === 'darwin'
-      ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-      : '/usr/bin/google-chrome'
-
-  return puppeteer.launch({
-    executablePath,
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
-  })
-}
-
 // ─── Función principal ────────────────────────────────────────
 
 export async function generarPDFCotizacion(datos: DatosCotizacionPDF): Promise<Buffer> {
-  const html = htmlCotizacion(datos)
-  const browser = await abrirBrowser()
+  // Imágenes incrustadas y reducidas antes de abrir Chrome (ver imagenes-pdf.ts)
+  const [logo, ...imagenes] = await Promise.all([
+    imagenParaPDF(LOGO_URL, 800),
+    ...datos.items.map((item) => imagenParaPDF(item.imagen_url, 200)), // se imprimen a 65 px
+  ])
+  const html = htmlCotizacion(
+    { ...datos, items: datos.items.map((item, i) => ({ ...item, imagen_url: imagenes[i] })) },
+    logo ?? '',
+  )
 
-  try {
-    const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'networkidle2', timeout: 20000 })
+  return conPagina(async (page) => {
+    // Todo va incrustado: 'load' no depende de la red
+    await page.setContent(html, { waitUntil: 'load', timeout: 20000 })
     const footerTemplate = `
       <div style="width:100%;font-family:Arial,sans-serif;font-size:8px;color:#999;
         display:flex;justify-content:space-between;align-items:center;
@@ -293,7 +271,5 @@ export async function generarPDFCotizacion(datos: DatosCotizacionPDF): Promise<B
       margin: { top: '10mm', right: '12mm', bottom: '16mm', left: '12mm' },
     })
     return Buffer.from(pdf)
-  } finally {
-    await browser.close()
-  }
+  })
 }

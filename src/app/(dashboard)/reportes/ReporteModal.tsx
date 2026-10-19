@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { X, Plus, Trash2, Upload, ImageOff } from 'lucide-react'
 import type { Reporte } from '@/types'
 import type { ClienteParaReporte, TecnicoParaReporte } from './ReportesClient'
+import { comprimirImagen } from '@/lib/comprimir-imagen'
 
 interface Props {
   reporte: Reporte | null
@@ -158,8 +159,10 @@ export default function ReporteModal({ reporte, clientes, tecnicos, onClose, onG
     setEv: React.Dispatch<React.SetStateAction<EvidenciaForm>>,
   ) {
     setEv((e) => ({ ...e, uploading: true }))
-    for (const file of files) {
+    for (const original of files) {
       try {
+        // Fotos de celular de 3–5 MB → ~300 KB antes de subir
+        const file = await comprimirImagen(original)
         const reader = new FileReader()
         const base64: string = await new Promise((res, rej) => {
           reader.onload = () => res((reader.result as string).split(',')[1])

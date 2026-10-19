@@ -1,6 +1,7 @@
-import puppeteer from 'puppeteer-core'
 import type { PagoPDF } from './pdf-cotizacion'
 import { escaparHtml as e, escaparMultilinea } from './html'
+import { conPagina } from './navegador'
+import { imagenParaPDF } from './imagenes-pdf'
 export type { PagoPDF }
 
 export interface ItemPDFReporte {
@@ -69,7 +70,7 @@ const DEFAULT_EMPRESA: EmpresaPDFReporte = {
 
 // ─── HTML Template ────────────────────────────────────────────
 
-function htmlReporte(d: DatosReportePDF): string {
+function htmlReporte(d: DatosReportePDF, logoSrc: string): string {
   const emp = d.empresa ?? DEFAULT_EMPRESA
 
   const tipoServStr = d.tipo_servicio.length > 0 ? d.tipo_servicio.join(' · ') : '—'
@@ -144,7 +145,7 @@ function htmlReporte(d: DatosReportePDF): string {
     transform: translate(-50%, -50%);
     width: 680px; height: 680px;
     opacity: 0.14; pointer-events: none;
-    background: url('${LOGO_URL}') no-repeat center/contain;
+    background: url('${logoSrc}') no-repeat center/contain;
   }
 
   /* ── Header empresa ── */
@@ -237,7 +238,7 @@ function htmlReporte(d: DatosReportePDF): string {
       Tel: ${e(emp.telefono)} | Email: ${e(emp.email)} | Web: ${e(emp.web)}
     </div>
   </div>
-  ${LOGO_URL ? `<img src="${e(LOGO_URL)}" class="logo-img" alt="${e(emp.nombre)}" />` : ''}
+  ${logoSrc ? `<img src="${e(logoSrc)}" class="logo-img" alt="${e(emp.nombre)}" />` : ''}
 </div>
 
 <div class="body">
@@ -332,42 +333,24 @@ function htmlReporte(d: DatosReportePDF): string {
 </html>`
 }
 
-// ─── Puppeteer ────────────────────────────────────────────────
-
-async function abrirBrowser() {
-  // Cloud sin Chrome instalado: Render, Vercel, AWS Lambda → usa @sparticuz/chromium
-  if (process.env.RENDER || process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
-    const chromium = (await import('@sparticuz/chromium')).default
-    return puppeteer.launch({
-      args: [...chromium.args, '--disable-dev-shm-usage'],
-      defaultViewport: { width: 1280, height: 900 },
-      executablePath: await chromium.executablePath(),
-      headless: true,
-    })
-  }
-
-  // Desarrollo local
-  const executablePath =
-    process.platform === 'win32'
-      ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-      : process.platform === 'darwin'
-      ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-      : '/usr/bin/google-chrome'
-
-  return puppeteer.launch({
-    executablePath,
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
-  })
-}
+// ─── Generación ───────────────────────────────────────────────
 
 export async function generarPDFReporte(datos: DatosReportePDF): Promise<Buffer> {
-  const html = htmlReporte(datos)
-  const browser = await abrirBrowser()
+  // Imágenes incrustadas y reducidas antes de abrir Chrome (ver imagenes-pdf.ts).
+  // Los enlaces que no son imagen (páginas de Google Drive) se descartan aquí.
+  const [logo, evidencias] = await Promise.all([
+    imagenParaPDF(LOGO_URL, 800),
+    Promise.all((datos.evidencias ?? []).map(async (ev) => ({
+      ...ev,
+      // se imprimen a 185×135 px
+      urls: (await Promise.all((ev.urls ?? []).map((u) => imagenParaPDF(u, 600)))).filter((u): u is string => !!u),
+    }))),
+  ])
+  const html = htmlReporte({ ...datos, evidencias }, logo ?? '')
 
-  try {
-    const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'networkidle2', timeout: 20000 })
+  return conPagina(async (page) => {
+    // Todo va incrustado: 'load' no depende de la red
+    await page.setContent(html, { waitUntil: 'load', timeout: 20000 })
     const footerTemplate = `
       <div style="width:100%;font-family:Arial,sans-serif;font-size:8px;color:#999;
         display:flex;justify-content:space-between;align-items:center;
@@ -384,7 +367,5 @@ export async function generarPDFReporte(datos: DatosReportePDF): Promise<Buffer>
       margin: { top: '10mm', right: '12mm', bottom: '16mm', left: '12mm' },
     })
     return Buffer.from(pdf)
-  } finally {
-    await browser.close()
-  }
+  })
 }

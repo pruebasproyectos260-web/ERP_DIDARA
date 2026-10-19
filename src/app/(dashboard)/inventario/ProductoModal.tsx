@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Upload, Image as ImageIcon } from 'lucide-react'
 import type { Producto } from '@/types'
+import { comprimirImagen } from '@/lib/comprimir-imagen'
 
 const CATEGORIAS_OPCIONES = [
   'CCTV', 'Redes', 'Energía', 'Telefonía', 'Cómputo',
@@ -122,7 +123,7 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
   async function subirImagen(file: File): Promise<string> {
     setSubiendoImagen(true)
     const fd = new FormData()
-    fd.append('file', file)
+    fd.append('file', await comprimirImagen(file, 1200))
     const res = await fetch('/api/inventario/upload', { method: 'POST', body: fd })
     const json = await res.json()
     setSubiendoImagen(false)
