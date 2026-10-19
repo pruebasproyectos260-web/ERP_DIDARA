@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, ExternalLink, Eye, Mail, Loader2, X, PenLine, BadgeCheck, Copy, Check, MessageCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, ExternalLink, Eye, Mail, Loader2, X, BadgeCheck, Copy, Check, MessageCircle, Wrench, Signature } from 'lucide-react'
 import type { Reporte } from '@/types'
 import ReporteModal from './ReporteModal'
 import { borrar } from '@/lib/api-cliente'
+import { BotonIcono, BotonPrincipal, Buscador, EncabezadoPagina, EstadoVacio, Segmentado } from '@/components/ui/Pagina'
 import { aviso, confirmar } from '@/components/ui/Avisos'
 
 export interface ClienteParaReporte {
@@ -40,6 +41,17 @@ const rowColors: Record<string, string> = {
   completado: 'bg-green-50',
   entregado:  'bg-purple-50',
   cancelado:  'bg-gray-50',
+}
+
+const ESTADOS_REPORTE = ['abierto', 'en_proceso', 'completado', 'entregado', 'cancelado']
+
+function etiquetaEstado(e: string) {
+  const t = e.replace('_', ' ')
+  return t.charAt(0).toUpperCase() + t.slice(1)
+}
+
+function fmt$(n: number) {
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
 }
 
 function formatDate(d: string) {
@@ -160,7 +172,8 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
     setMailState((s) => {
       if (!s) return s
       const next = new Set(s.selected)
-      next.has(email) ? next.delete(email) : next.add(email)
+      if (next.has(email)) next.delete(email)
+      else next.add(email)
       return { ...s, selected: next }
     })
   }
@@ -201,51 +214,99 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
   const puedeEditar  = nivel <= 2
   const puedeEliminar = nivel <= 1
 
-  return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reportes de Servicio</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{filtrados.length} reporte(s)</p>
-        </div>
-        {puedeEditar && (
-          <button
-            onClick={() => setModal({ open: true, reporte: null })}
-            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            <Plus size={16} /> Nuevo reporte
-          </button>
+  const conteoEstado = reportes.reduce<Record<string, number>>((acc, r) => {
+    acc[r.estado] = (acc[r.estado] ?? 0) + 1
+    return acc
+  }, {})
+  const opcionesEstado = [
+    { value: '', label: `Todos ${reportes.length}` },
+    ...ESTADOS_REPORTE.filter((e) => conteoEstado[e]).map((e) => ({ value: e, label: `${etiquetaEstado(e)} ${conteoEstado[e]}` })),
+  ]
+
+  // Acciones de cada reporte (se usan en la tabla y en las tarjetas)
+  function acciones(r: Reporte, tam: number) {
+    return (
+      <>
+        <BotonIcono titulo="Ver detalle" tono="marca" onClick={() => setVerDetalle(r)}><Eye size={tam} /></BotonIcono>
+        <BotonIcono titulo="Ver PDF" tono="exito" onClick={() => abrirPDF(r.id)}><ExternalLink size={tam} /></BotonIcono>
+        {puedeEditar && <BotonIcono titulo="Enviar por correo" tono="marca" onClick={() => abrirMail(r)}><Mail size={tam} /></BotonIcono>}
+        {r.firma_fecha ? (
+          <span className="p-2 text-purple-600"
+            title={`Firmado por el cliente el ${new Date(r.firma_fecha).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}`}>
+            <BadgeCheck size={tam} />
+          </span>
+        ) : puedeEditar && (
+          <BotonIcono titulo="Enlace de firma para el cliente" tono="violeta" onClick={() => abrirFirma(r)} disabled={generandoFirma === r.id}>
+            {generandoFirma === r.id ? <Loader2 size={tam} className="animate-spin" /> : <Signature size={tam} />}
+          </BotonIcono>
         )}
-      </div>
+        {puedeEditar && <BotonIcono titulo="Editar" tono="marca" onClick={() => setModal({ open: true, reporte: r })}><Pencil size={tam} /></BotonIcono>}
+        {puedeEliminar && <BotonIcono titulo="Eliminar" tono="peligro" onClick={() => eliminar(r.id)}><Trash2 size={tam} /></BotonIcono>}
+      </>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <EncabezadoPagina
+        titulo="Reportes de servicio"
+        subtitulo={`${filtrados.length} de ${reportes.length} reportes`}
+        acciones={puedeEditar && (
+          <BotonPrincipal onClick={() => setModal({ open: true, reporte: null })}>
+            <Plus size={17} /> <span>Nuevo reporte</span>
+          </BotonPrincipal>
+        )}
+      />
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por folio, cliente o equipo..."
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 w-64"
-        />
-        {['', 'abierto', 'en_proceso', 'completado', 'entregado', 'cancelado'].map((e) => (
-          <button
-            key={e}
-            onClick={() => setFiltroEstado(e)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-              filtroEstado === e
-                ? 'bg-brand-600 text-white border-brand-600'
-                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            {e === '' ? 'Todos' : e.replace('_', ' ')}
-          </button>
-        ))}
+      <div className="space-y-3">
+        <Buscador valor={busqueda} onCambio={setBusqueda} placeholder="Buscar por folio, cliente o equipo…" />
+        <Segmentado opciones={opcionesEstado} valor={filtroEstado} onCambio={setFiltroEstado} />
       </div>
 
-      {/* Tabla */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm min-w-[820px]">
+      {filtrados.length === 0 && (
+        <div className="rounded-2xl border border-gray-200 bg-white">
+          <EstadoVacio icono={<Wrench size={22} />} titulo={busqueda || filtroEstado ? 'Sin resultados' : 'No hay reportes aún'}
+            descripcion={busqueda || filtroEstado ? 'Prueba con otra búsqueda o quita el filtro de estado.' : 'Crea el primero con el botón “Nuevo reporte”.'} />
+        </div>
+      )}
+
+      {/* Celular y tableta: tarjetas */}
+      <div className="space-y-3 lg:hidden">
+        {filtrados.map((r) => {
+          const cliente = (r.cliente as { nombre: string } | undefined)?.nombre ?? '—'
+          const tecnico = (r.tecnico as { nombre: string } | undefined)?.nombre ?? '—'
+          const equipoStr = [r.equipo, r.marca, r.modelo].filter(Boolean).join(' · ')
+          return (
+            <article key={r.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm shadow-black/[0.02]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-semibold text-brand-700">{r.folio}</span>
+                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${estadoConfig[r.estado] ?? estadoConfig.abierto}`}>
+                      {etiquetaEstado(r.estado)}
+                    </span>
+                  </div>
+                  <h3 className="mt-1 truncate font-semibold text-gray-900">{cliente}</h3>
+                  <p className="truncate text-xs text-gray-500">{equipoStr}</p>
+                </div>
+                <p className="shrink-0 text-lg font-semibold tracking-tight text-gray-900">{fmt$(Number(r.total))}</p>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-3 text-xs text-gray-500">
+                <span>{formatDate(r.fecha_ingreso)}{r.fecha_entrega ? ` → ${formatDate(r.fecha_entrega)}` : ''}</span>
+                <span>Técnico: {tecnico}</span>
+              </div>
+              <div className="-mr-2 mt-2 flex items-center justify-end border-t border-gray-100 pt-2">
+                {acciones(r, 17)}
+              </div>
+            </article>
+          )
+        })}
+      </div>
+
+      {/* Escritorio: tabla */}
+      <div className={`hidden overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm shadow-black/[0.02] ${filtrados.length ? 'lg:block' : ''}`}>
+        <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Folio</th>
@@ -286,73 +347,14 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
                   <td className="px-3 py-2.5 text-xs text-gray-600">{tecnico}</td>
                   <td className="px-3 py-2.5">
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${badgeCls}`}>
-                      {r.estado.replace('_', ' ')}
+                      {etiquetaEstado(r.estado)}
                     </span>
                   </td>
                   <td className="px-3 py-2.5 text-right font-semibold text-gray-900 whitespace-nowrap">
-                    ${Number(r.total).toFixed(2)}
+                    {fmt$(Number(r.total))}
                   </td>
                   <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-1 justify-end">
-                      <button
-                        onClick={() => setVerDetalle(verDetalle?.id === r.id ? null : r)}
-                        className={`p-1.5 rounded-lg transition-colors ${verDetalle?.id === r.id ? 'text-brand-600 bg-brand-50' : 'text-gray-400 hover:text-brand-600 hover:bg-brand-50'}`}
-                        title="Ver detalle"
-                      >
-                        <Eye size={13} />
-                      </button>
-                      <button
-                        onClick={() => abrirPDF(r.id)}
-                        className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                        title="Ver PDF"
-                      >
-                        <ExternalLink size={13} />
-                      </button>
-                      {puedeEditar && (
-                        <button
-                          onClick={() => abrirMail(r)}
-                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                          title="Enviar por correo"
-                        >
-                          <Mail size={13} />
-                        </button>
-                      )}
-                      {r.firma_fecha ? (
-                        <span
-                          className="p-1.5 text-purple-600"
-                          title={`Firmado por el cliente el ${new Date(r.firma_fecha).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}`}
-                        >
-                          <BadgeCheck size={13} />
-                        </span>
-                      ) : puedeEditar && (
-                        <button
-                          onClick={() => abrirFirma(r)}
-                          disabled={generandoFirma === r.id}
-                          className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors disabled:opacity-50"
-                          title="Enlace de firma para el cliente"
-                        >
-                          {generandoFirma === r.id ? <Loader2 size={13} className="animate-spin" /> : <PenLine size={13} />}
-                        </button>
-                      )}
-                      {puedeEditar && (
-                        <button
-                          onClick={() => setModal({ open: true, reporte: r })}
-                          className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-                          title="Editar"
-                        >
-                          <Pencil size={13} />
-                        </button>
-                      )}
-                      {puedeEliminar && (
-                        <button
-                          onClick={() => eliminar(r.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Eliminar"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      )}
-                    </div>
+                    <div className="flex items-center justify-end">{acciones(r, 15)}</div>
                   </td>
                 </tr>
               )
@@ -368,10 +370,10 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
         const tecnico = (r.tecnico as { nombre: string } | undefined)?.nombre ?? '—'
         return (
           <div
-            className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto"
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-2 animate-aparecer sm:p-4"
             onClick={(e) => { if (e.target === e.currentTarget) setVerDetalle(null) }}
           >
-            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 w-full max-w-2xl my-6">
+            <div className="my-2 w-full max-w-2xl space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-2xl animate-subir sm:my-6 sm:p-5">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-3">
@@ -451,11 +453,11 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
 
       {/* Modal: Enviar por correo */}
       {mailState && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 animate-aparecer sm:items-center sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full animate-subir max-w-lg max-h-[92dvh] sm:max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 shrink-0">
               <div className="flex items-center gap-2">
-                <Mail size={16} className="text-indigo-600" />
+                <Mail size={16} className="text-brand-600" />
                 <h2 className="text-base font-semibold text-gray-900">Enviar reporte {mailState.rep.folio}</h2>
               </div>
               <button onClick={() => setMailState(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
@@ -493,7 +495,7 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
                               <span className="text-sm font-medium text-gray-800">{c.nombre}</span>
                               {c.cargo && <span className="text-xs text-gray-400 ml-1.5">{c.cargo}</span>}
                               <br />
-                              <span className="text-xs text-indigo-600">{c.email}</span>
+                              <span className="text-xs text-brand-600">{c.email}</span>
                               {c.telefono && <span className="text-xs text-gray-400 ml-2">{c.telefono}</span>}
                             </span>
                           </label>
@@ -530,7 +532,7 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
                     <label className="block text-xs font-medium text-gray-600 mb-1">Mensaje personalizado (opcional)</label>
                     <textarea rows={3} value={mailState.mensaje}
                       onChange={(e) => setMailState((s) => s && ({ ...s, mensaje: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
                       placeholder="Escribe un mensaje personalizado para incluir en el correo..." />
                   </div>
 
@@ -556,7 +558,7 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
                   Cancelar
                 </button>
                 <button onClick={enviarMail} disabled={mailState.enviando || mailState.selected.size === 0}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors">
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors">
                   {mailState.enviando ? <><Loader2 size={14} className="animate-spin" />Enviando...</> : <><Mail size={14} />Enviar</>}
                 </button>
               </div>
@@ -567,11 +569,11 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
 
       {/* Modal enlace de firma */}
       {firmaLink && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setFirmaLink(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 animate-aparecer sm:items-center sm:p-4" onClick={() => setFirmaLink(null)}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full animate-subir max-h-[92dvh] overflow-y-auto max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
               <div className="flex items-center gap-2">
-                <PenLine size={16} className="text-purple-600" />
+                <Signature size={16} className="text-purple-600" />
                 <h3 className="font-semibold text-gray-900">Firma del cliente — {firmaLink.rep.folio}</h3>
               </div>
               <button onClick={() => setFirmaLink(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>

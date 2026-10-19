@@ -1,12 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, ExternalLink, Pencil, Trash2, Eye, X, ArrowUp, ArrowDown, Mail, Loader2 } from 'lucide-react'
+import { Plus, ExternalLink, Pencil, Trash2, Eye, X, ArrowUp, ArrowDown, Mail, Loader2, FileText } from 'lucide-react'
 import type { Cotizacion, EstadoCotizacion } from '@/types'
 import CotizacionModal from './CotizacionModal'
 import { borrar } from '@/lib/api-cliente'
 import type { ClienteParaCot, ProductoParaCot } from './CotizacionModal'
 import { aviso, confirmar } from '@/components/ui/Avisos'
+import { BotonIcono, BotonPrincipal, Buscador, EncabezadoPagina, EstadoVacio, Segmentado } from '@/components/ui/Pagina'
+
+const capitalizar = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 interface Props {
   cotizaciones: Cotizacion[]
@@ -141,7 +144,8 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
     setMailState((s) => {
       if (!s) return s
       const next = new Set(s.selected)
-      next.has(email) ? next.delete(email) : next.add(email)
+      if (next.has(email)) next.delete(email)
+      else next.add(email)
       return { ...s, selected: next }
     })
   }
@@ -185,51 +189,100 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
   const puedeVerIVA = nivel <= 1 || esContador
   const puedeCambiarEstado = nivel <= 2
 
+  // Cuántas cotizaciones hay de cada estado (para los filtros)
+  const conteoEstado = cotizaciones.reduce<Record<string, number>>((acc, c) => {
+    acc[c.estado] = (acc[c.estado] ?? 0) + 1
+    return acc
+  }, {})
+  const opcionesEstado = [
+    { value: '', label: `Todas ${cotizaciones.length}` },
+    ...ESTADOS.filter((e) => conteoEstado[e]).map((e) => ({ value: e, label: `${capitalizar(e)} ${conteoEstado[e]}` })),
+  ]
+
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Cotizaciones</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{filtradas.length} cotización(es)</p>
-        </div>
-        {puedeEditar && (
-          <button
-            onClick={() => setModal({ open: true, cotizacion: null })}
-            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            <Plus size={16} /> Nueva Cotización
-          </button>
+    <div className="space-y-5">
+      <EncabezadoPagina
+        titulo="Cotizaciones"
+        subtitulo={`${filtradas.length} de ${cotizaciones.length} cotizaciones`}
+        acciones={puedeEditar && (
+          <BotonPrincipal onClick={() => setModal({ open: true, cotizacion: null })}>
+            <Plus size={17} /> <span>Nueva cotización</span>
+          </BotonPrincipal>
         )}
-      </div>
+      />
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por ID o cliente..."
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 w-56"
-        />
-        {['', ...ESTADOS].map((e) => (
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <Buscador valor={busqueda} onCambio={setBusqueda} placeholder="Buscar por folio o cliente…" className="flex-1" />
           <button
-            key={e}
-            onClick={() => setFiltroEstado(e)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-              filtroEstado === e
-                ? 'bg-brand-600 text-white border-brand-600'
-                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
+            onClick={() => setSortDir((d) => d === 'desc' ? 'asc' : 'desc')}
+            title={sortDir === 'desc' ? 'Más recientes primero' : 'Más antiguas primero'}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-600 hover:bg-gray-50"
           >
-            {e === '' ? 'Todas' : e.charAt(0).toUpperCase() + e.slice(1)}
+            {sortDir === 'desc' ? <ArrowDown size={15} /> : <ArrowUp size={15} />}
+            <span className="hidden sm:inline">{sortDir === 'desc' ? 'Recientes' : 'Antiguas'}</span>
           </button>
-        ))}
+        </div>
+        <Segmentado opciones={opcionesEstado} valor={filtroEstado} onCambio={setFiltroEstado} />
       </div>
 
-      {/* Tabla */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm min-w-[900px]">
+      {filtradas.length === 0 && (
+        <div className="rounded-2xl border border-gray-200 bg-white">
+          <EstadoVacio icono={<FileText size={22} />} titulo="No hay cotizaciones"
+            descripcion={busqueda || filtroEstado ? 'Prueba con otra búsqueda o quita el filtro de estado.' : 'Crea la primera con el botón “Nueva cotización”.'} />
+        </div>
+      )}
+
+      {/* Celular y tableta: tarjetas */}
+      <div className="space-y-3 lg:hidden">
+        {filtradas.map((cot) => {
+          const cfg = estadoConfig[cot.estado] ?? estadoConfig.borrador
+          const clienteNombre = (cot.cliente as { nombre: string } | undefined)?.nombre ?? '—'
+          return (
+            <article key={cot.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm shadow-black/[0.02]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-mono text-xs font-semibold text-brand-700">{cot.folio}</p>
+                  <h3 className="mt-0.5 truncate font-semibold text-gray-900">{clienteNombre}</h3>
+                  <p className="text-xs text-gray-500">{fmtDate(cot.fecha)} · {cot.elaborado_por ?? '—'}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-semibold tracking-tight text-gray-900">{fmt$(cot.total)}</p>
+                  {puedeVerGanancia && cot.ganancia_total != null && (
+                    <p className="text-xs font-medium text-green-700">Ganancia {fmt$(cot.ganancia_total)}</p>
+                  )}
+                  {puedeVerIVA && cot.aplica_iva && cot.iva_monto > 0 && (
+                    <p className="text-xs text-yellow-700">IVA {fmt$(cot.iva_monto)}</p>
+                  )}
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-3">
+                {puedeCambiarEstado ? (
+                  <select value={cot.estado} onChange={(e) => cambiarEstado(cot.id, e.target.value as EstadoCotizacion)}
+                    aria-label={`Estado de ${cot.folio}`}
+                    className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${cfg.badge}`}>
+                    {ESTADOS.map((e) => <option key={e} value={e}>{capitalizar(e)}</option>)}
+                  </select>
+                ) : (
+                  <span className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${cfg.badge}`}>{capitalizar(cot.estado)}</span>
+                )}
+                <div className="-mr-2 flex items-center">
+                  <BotonIcono titulo="Ver detalle" tono="marca" onClick={() => setCotizacionVer(cot)}><Eye size={17} /></BotonIcono>
+                  <BotonIcono titulo="Ver PDF" tono="exito" onClick={() => abrirPDF(cot.id)}><ExternalLink size={17} /></BotonIcono>
+                  {puedeEditar && <BotonIcono titulo="Enviar por correo" tono="marca" onClick={() => abrirMail(cot)}><Mail size={17} /></BotonIcono>}
+                  {puedeEditar && <BotonIcono titulo="Editar" tono="marca" onClick={() => setModal({ open: true, cotizacion: cot })}><Pencil size={17} /></BotonIcono>}
+                  {puedeEliminar && <BotonIcono titulo="Eliminar" tono="peligro" onClick={() => eliminar(cot.id)}><Trash2 size={17} /></BotonIcono>}
+                </div>
+              </div>
+            </article>
+          )
+        })}
+      </div>
+
+      {/* Escritorio: tabla */}
+      <div className={`hidden overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm shadow-black/[0.02] ${filtradas.length ? 'lg:block' : ''}`}>
+        <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">
@@ -249,8 +302,8 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
               {puedeVerGanancia && (
                 <th className="text-right px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Ganancia</th>
               )}
-              <th className="text-left px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Cliente de</th>
-              <th className="text-left px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Elaborado por</th>
+              <th className="hidden 2xl:table-cell text-left px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Cliente de</th>
+              <th className="hidden xl:table-cell text-left px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Elaborado por</th>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">Estado</th>
               <th className="px-3 py-2.5"></th>
             </tr>
@@ -269,7 +322,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
               return (
                 <tr key={cot.id} className={`${cfg.row} border-b border-gray-100`}>
                   <td className="px-3 py-2.5">
-                    <span className="font-bold text-xs font-mono text-brand-700">{cot.folio}</span>
+                    <span className="whitespace-nowrap font-bold text-xs font-mono text-brand-700">{cot.folio}</span>
                   </td>
                   <td className="px-3 py-2.5 text-xs text-gray-700 whitespace-nowrap">{fmtDate(cot.fecha)}</td>
                   <td className="px-3 py-2.5 font-medium text-gray-900 max-w-[180px] truncate">{clienteNombre}</td>
@@ -290,8 +343,8 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
                         : <span className="text-gray-300 text-xs">—</span>}
                     </td>
                   )}
-                  <td className="px-3 py-2.5 text-xs text-gray-600">{cot.quien_es_el_cliente ?? 'Didara'}</td>
-                  <td className="px-3 py-2.5 text-xs text-gray-600 max-w-[140px] truncate">{cot.elaborado_por ?? '—'}</td>
+                  <td className="hidden 2xl:table-cell px-3 py-2.5 text-xs text-gray-600">{cot.quien_es_el_cliente ?? 'Didara'}</td>
+                  <td className="hidden xl:table-cell px-3 py-2.5 text-xs text-gray-600 max-w-[140px] truncate">{cot.elaborado_por ?? '—'}</td>
                   <td className="px-3 py-2.5">
                     {puedeCambiarEstado ? (
                       <select
@@ -310,48 +363,12 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
                     )}
                   </td>
                   <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-1 justify-end">
-                      <button
-                        onClick={() => setCotizacionVer(cotizacionVer?.id === cot.id ? null : cot)}
-                        className={`p-1.5 rounded-lg transition-colors ${cotizacionVer?.id === cot.id ? 'text-brand-600 bg-brand-50' : 'text-gray-400 hover:text-brand-600 hover:bg-brand-50'}`}
-                        title="Ver detalle"
-                      >
-                        <Eye size={13} />
-                      </button>
-                      <button
-                        onClick={() => abrirPDF(cot.id)}
-                        className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                        title="Ver PDF en línea"
-                      >
-                        <ExternalLink size={13} />
-                      </button>
-                      {puedeEditar && (
-                        <button
-                          onClick={() => abrirMail(cot)}
-                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                          title="Enviar por correo"
-                        >
-                          <Mail size={13} />
-                        </button>
-                      )}
-                      {puedeEditar && (
-                        <button
-                          onClick={() => setModal({ open: true, cotizacion: cot })}
-                          className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-                          title="Editar"
-                        >
-                          <Pencil size={13} />
-                        </button>
-                      )}
-                      {puedeEliminar && (
-                        <button
-                          onClick={() => eliminar(cot.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Eliminar"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      )}
+                    <div className="flex items-center justify-end">
+                      <BotonIcono titulo="Ver detalle" tono="marca" onClick={() => setCotizacionVer(cot)}><Eye size={15} /></BotonIcono>
+                      <BotonIcono titulo="Ver PDF" tono="exito" onClick={() => abrirPDF(cot.id)}><ExternalLink size={15} /></BotonIcono>
+                      {puedeEditar && <BotonIcono titulo="Enviar por correo" tono="marca" onClick={() => abrirMail(cot)}><Mail size={15} /></BotonIcono>}
+                      {puedeEditar && <BotonIcono titulo="Editar" tono="marca" onClick={() => setModal({ open: true, cotizacion: cot })}><Pencil size={15} /></BotonIcono>}
+                      {puedeEliminar && <BotonIcono titulo="Eliminar" tono="peligro" onClick={() => eliminar(cot.id)}><Trash2 size={15} /></BotonIcono>}
                     </div>
                   </td>
                 </tr>
@@ -367,8 +384,8 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
         const cfg = estadoConfig[cot.estado] ?? estadoConfig.borrador
         const clienteObj = cot.cliente as { nombre: string; rfc?: string; uso_cfdi?: string } | undefined
         return (
-          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) setCotizacionVer(null) }}>
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 w-full max-w-3xl my-6">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-2 animate-aparecer sm:p-4" onClick={(e) => { if (e.target === e.currentTarget) setCotizacionVer(null) }}>
+          <div className="my-2 w-full max-w-3xl space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-2xl animate-subir sm:my-6 sm:p-5">
             {/* Encabezado */}
             <div className="flex items-start justify-between">
               <div>
@@ -386,7 +403,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
             </div>
 
             {/* Info general */}
-            <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm">
+            <div className="grid grid-cols-1 gap-x-8 gap-y-1.5 text-sm sm:grid-cols-2">
               <div><span className="text-gray-500">Cliente:</span> <span className="font-medium text-gray-900">{clienteObj?.nombre ?? '-'}</span></div>
               <div><span className="text-gray-500">Elaborado por:</span> <span className="text-gray-700">{cot.elaborado_por ?? '—'}</span></div>
               {nivel <= 2 && clienteObj?.rfc && (
@@ -399,7 +416,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
                 <div><span className="text-gray-500">Cliente de:</span> <span className="text-gray-700">{cot.quien_es_el_cliente}</span></div>
               )}
               {cot.direccion_entrega && (
-                <div className="col-span-2"><span className="text-gray-500">Dirección entrega:</span> <span className="text-gray-700">{cot.direccion_entrega}</span></div>
+                <div className="sm:col-span-2"><span className="text-gray-500">Dirección entrega:</span> <span className="text-gray-700">{cot.direccion_entrega}</span></div>
               )}
             </div>
 
@@ -463,7 +480,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
 
             {/* Totales */}
             <div className="flex justify-end">
-              <div className="w-64 space-y-1 text-sm">
+              <div className="w-full space-y-1 text-sm sm:w-64">
                 <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{fmt$(cot.subtotal)}</span></div>
                 {cot.aplica_iva && (
                   <div className="flex justify-between text-gray-600"><span>IVA ({cot.iva_porcentaje}%)</span><span>{fmt$(cot.iva_monto)}</span></div>
@@ -488,11 +505,11 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
 
       {/* Modal: Enviar por correo */}
       {mailState && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 animate-aparecer sm:items-center sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full animate-subir max-w-lg max-h-[92dvh] sm:max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 shrink-0">
               <div className="flex items-center gap-2">
-                <Mail size={16} className="text-indigo-600" />
+                <Mail size={16} className="text-brand-600" />
                 <h2 className="text-base font-semibold text-gray-900">Enviar cotización {mailState.cot.folio}</h2>
               </div>
               <button onClick={() => setMailState(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
@@ -530,7 +547,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
                               <span className="text-sm font-medium text-gray-800">{c.nombre}</span>
                               {c.cargo && <span className="text-xs text-gray-400 ml-1.5">{c.cargo}</span>}
                               <br />
-                              <span className="text-xs text-indigo-600">{c.email}</span>
+                              <span className="text-xs text-brand-600">{c.email}</span>
                               {c.telefono && <span className="text-xs text-gray-400 ml-2">{c.telefono}</span>}
                             </span>
                           </label>
@@ -567,7 +584,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
                     <label className="block text-xs font-medium text-gray-600 mb-1">Mensaje personalizado (opcional)</label>
                     <textarea rows={3} value={mailState.mensaje}
                       onChange={(e) => setMailState((s) => s && ({ ...s, mensaje: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
                       placeholder="Escribe un mensaje personalizado para incluir en el correo..." />
                   </div>
 
@@ -593,7 +610,7 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
                   Cancelar
                 </button>
                 <button onClick={enviarMail} disabled={mailState.enviando || mailState.selected.size === 0}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors">
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors">
                   {mailState.enviando ? <><Loader2 size={14} className="animate-spin" />Enviando...</> : <><Mail size={14} />Enviar</>}
                 </button>
               </div>

@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Plus, Pencil, Trash2, X, Check, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Check, AlertTriangle, ClipboardList } from 'lucide-react'
 import type { Pendiente, Cliente, Usuario } from '@/types'
 import { borrar } from '@/lib/api-cliente'
 import { aviso, confirmar } from '@/components/ui/Avisos'
+import { BotonIcono, BotonPrincipal, EncabezadoPagina, EstadoVacio, Segmentado } from '@/components/ui/Pagina'
 
 const ESTADOS: Pendiente['estado'][] = ['Pendiente', 'Completado']
 
@@ -208,46 +209,91 @@ export default function PendientesPage() {
 
   const techName = (id: string) => usuarios.find(u => u.id === id)?.nombre ?? id
 
+  const vencidos = pendientes.filter(esVencido).length
+
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pendientes</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{filtrados.length} pendiente(s)</p>
+    <div className="space-y-5">
+      <EncabezadoPagina
+        titulo="Pendientes"
+        subtitulo={<>
+          {filtrados.length} pendiente{filtrados.length === 1 ? '' : 's'}
+          {vencidos > 0 && <span className="ml-2 font-medium text-red-600">· {vencidos} vencido{vencidos === 1 ? '' : 's'}</span>}
+        </>}
+        acciones={
+          <BotonPrincipal onClick={abrirNuevo}>
+            <Plus size={17} /> <span>Nuevo pendiente</span>
+          </BotonPrincipal>
+        }
+      />
+
+      <Segmentado
+        opciones={[{ value: '', label: 'Todos' }, ...ESTADOS.map((e) => ({ value: e as string, label: e }))]}
+        valor={filtroEstado}
+        onCambio={setFiltroEstado}
+      />
+
+      {!loading && filtrados.length === 0 && (
+        <div className="rounded-2xl border border-gray-200 bg-white">
+          <EstadoVacio icono={<ClipboardList size={22} />} titulo="No hay pendientes" descripcion="Todo al día por aquí." />
         </div>
-        <button
-          onClick={abrirNuevo}
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-        >
-          <Plus size={16} /> Nuevo pendiente
-        </button>
-      </div>
+      )}
 
-      {/* Filtros */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-gray-500 font-medium">Estado:</span>
-        {(['', ...ESTADOS] as string[]).map(e => (
-          <button
-            key={e}
-            onClick={() => setFiltroEstado(e)}
-            className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${
-              filtroEstado === e
-                ? 'bg-brand-600 text-white border-brand-600'
-                : 'bg-white text-gray-600 border-gray-300 hover:border-brand-400'
-            }`}
-          >
-            {e || 'Todos'}
-          </button>
-        ))}
-      </div>
+      {loading && (
+        <div className="space-y-3">
+          {[0, 1, 2].map((i) => <div key={i} className="h-24 rounded-2xl border border-gray-200 bg-white animate-brillo" />)}
+        </div>
+      )}
 
-      {/* Tabla */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-        {loading ? (
-          <div className="py-12 text-center text-gray-400 text-sm">Cargando...</div>
-        ) : (
-          <table className="w-full text-sm min-w-[900px]">
+      {/* Celular y tableta: tarjetas */}
+      {!loading && (
+        <div className="space-y-3 lg:hidden">
+          {filtrados.map(p => {
+            const vencido = esVencido(p)
+            const completado = p.estado === 'Completado'
+            return (
+              <article key={p.id}
+                className={`flex gap-3 rounded-2xl border bg-white p-4 shadow-sm shadow-black/[0.02] ${vencido ? 'border-red-200' : 'border-gray-200'}`}>
+                <button
+                  onClick={() => toggleEstado(p)}
+                  aria-label={completado ? 'Marcar como pendiente' : 'Marcar como completado'}
+                  className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                    completado ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300 hover:border-brand-500'}`}
+                >
+                  {completado && <Check size={14} strokeWidth={3} />}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className={`font-semibold leading-snug ${completado ? 'text-gray-400 line-through' : vencido ? 'text-red-700' : 'text-gray-900'}`}>
+                      {p.cliente_nombre ?? 'Sin cliente'}
+                    </h3>
+                    <div className="-mr-2 -mt-1.5 flex shrink-0">
+                      <BotonIcono titulo="Editar" tono="marca" onClick={() => abrirEditar(p)}><Pencil size={15} /></BotonIcono>
+                      <BotonIcono titulo="Eliminar" tono="peligro" onClick={() => eliminar(p.id)}><Trash2 size={15} /></BotonIcono>
+                    </div>
+                  </div>
+                  <p className={`mt-0.5 text-sm ${completado ? 'text-gray-400' : 'text-gray-700'}`}>{p.descripcion}</p>
+                  {p.contacto_nombre && <p className="mt-1 text-xs text-gray-500">Contacto: {p.contacto_nombre}</p>}
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    {p.tecnico_ids.map(id => (
+                      <span key={id} className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">{techName(id)}</span>
+                    ))}
+                    {p.fecha_max_entrega && (
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${vencido ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {vencido && <AlertTriangle size={11} />}Entrega {fmt(p.fecha_max_entrega)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Escritorio: tabla */}
+      <div className={`hidden overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm shadow-black/[0.02] ${!loading && filtrados.length ? 'lg:block' : ''}`}>
+        {loading ? null : (
+          <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase">Cliente</th>
@@ -315,19 +361,9 @@ export default function PendientesPage() {
                       </button>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 justify-end">
-                        <button
-                          onClick={() => abrirEditar(p)}
-                          className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-                        >
-                          <Pencil size={13} />
-                        </button>
-                        <button
-                          onClick={() => eliminar(p.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                      <div className="flex items-center justify-end">
+                        <BotonIcono titulo="Editar" tono="marca" onClick={() => abrirEditar(p)}><Pencil size={15} /></BotonIcono>
+                        <BotonIcono titulo="Eliminar" tono="peligro" onClick={() => eliminar(p.id)}><Trash2 size={15} /></BotonIcono>
                       </div>
                     </td>
                   </tr>
@@ -340,8 +376,8 @@ export default function PendientesPage() {
 
       {/* Modal */}
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 animate-aparecer sm:items-center sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full animate-subir max-w-lg flex flex-col max-h-[92dvh] sm:max-h-[90vh]">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
               <h2 className="text-lg font-semibold">
                 {editando ? 'Editar pendiente' : 'Nuevo pendiente'}

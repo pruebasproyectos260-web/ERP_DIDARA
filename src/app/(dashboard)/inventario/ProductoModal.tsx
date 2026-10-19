@@ -73,8 +73,6 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
   const [imagenPreview, setImagenPreview] = useState(producto?.imagen_url ?? '')
   const [subiendoImagen, setSubiendoImagen] = useState(false)
 
-  const [precioVentaConIva, setPrecioVentaConIva] = useState(0)
-  const [precioCompraConIva, setPrecioCompraConIva] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -84,17 +82,13 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
     if (sat) setField('clave_sat_unidad', sat.clave)
   }, [form.unidad]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    const neto = parseFloat(form.precio_venta) || 0
-    const iva = parseFloat(form.iva_venta) || 0
-    setPrecioVentaConIva(form.precio_venta_incluye_iva ? neto : neto * (1 + iva / 100))
-  }, [form.precio_venta, form.iva_venta, form.precio_venta_incluye_iva])
-
-  useEffect(() => {
-    const neto = parseFloat(form.precio_compra_neto) || 0
-    const iva = parseFloat(form.iva_compra) || 0
-    setPrecioCompraConIva(form.precio_compra_incluye_iva ? neto : neto * (1 + iva / 100))
-  }, [form.precio_compra_neto, form.iva_compra, form.precio_compra_incluye_iva])
+  // Precios con IVA: se calculan directo del formulario (no necesitan estado propio)
+  const conIva = (neto: string, iva: string, incluye: boolean) => {
+    const n = parseFloat(neto) || 0
+    return incluye ? n : n * (1 + (parseFloat(iva) || 0) / 100)
+  }
+  const precioVentaConIva = conIva(form.precio_venta, form.iva_venta, form.precio_venta_incluye_iva)
+  const precioCompraConIva = conIva(form.precio_compra_neto, form.iva_compra, form.precio_compra_incluye_iva)
 
   function setField(field: keyof typeof form, value: string | boolean) {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -183,8 +177,8 @@ export default function ProductoModal({ producto, ivaDefault, onClose, onGuardad
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 animate-aparecer sm:items-center sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full animate-subir max-w-xl max-h-[92dvh] sm:max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold">
             {esNuevo ? 'Nuevo producto' : 'Editar producto'}

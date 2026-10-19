@@ -5,6 +5,7 @@ import { History, Pencil, Plus, Settings, Trash2, Users } from 'lucide-react'
 import type { Usuario, Configuracion } from '@/types'
 import ActividadPanel from './ActividadPanel'
 import { aviso, confirmar } from '@/components/ui/Avisos'
+import { BotonIcono, BotonPrincipal, EncabezadoPagina } from '@/components/ui/Pagina'
 
 interface Props {
   usuarios: Usuario[]
@@ -171,24 +172,38 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
 
   // ── Render ───────────────────────────────────────────────────
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Panel de Administración</h1>
+  const claseNivel = (nivel: number) =>
+    nivel <= 1 ? 'bg-brand-100 text-brand-700' : nivel === 2 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
 
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2">
-        {(['usuarios', 'config', 'actividad'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              tab === t ? 'bg-brand-600 text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            {t === 'usuarios' ? <Users size={15} /> : t === 'config' ? <Settings size={15} /> : <History size={15} />}
-            {t === 'usuarios' ? 'Usuarios' : t === 'config' ? 'Configuración' : 'Actividad y respaldo'}
-          </button>
-        ))}
+  return (
+    <div className="space-y-5">
+      <EncabezadoPagina
+        titulo="Administración"
+        subtitulo="Usuarios, datos de la empresa, actividad y respaldos"
+        acciones={tab === 'usuarios' && (
+          <BotonPrincipal onClick={() => setModalUsuario(true)}>
+            <Plus size={17} /> <span>Nuevo usuario</span>
+          </BotonPrincipal>
+        )}
+      />
+
+      {/* Pestañas */}
+      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <div className="inline-flex gap-1 rounded-xl border border-gray-200 bg-white p-1">
+          {(['usuarios', 'config', 'actividad'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              aria-pressed={tab === t}
+              className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+                tab === t ? 'bg-brand-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {t === 'usuarios' ? <Users size={15} /> : t === 'config' ? <Settings size={15} /> : <History size={15} />}
+              {t === 'usuarios' ? 'Usuarios' : t === 'config' ? 'Configuración' : 'Actividad y respaldo'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === 'actividad' && <ActividadPanel />}
@@ -196,16 +211,38 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
       {/* ── Usuarios ── */}
       {tab === 'usuarios' && (
         <div className="space-y-4">
-          <div className="flex justify-end">
-            <button
-              onClick={() => setModalUsuario(true)}
-              className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              <Plus size={16} />
-              Nuevo usuario
-            </button>
+          {/* Celular: tarjetas */}
+          <div className="space-y-3 md:hidden">
+            {usuarios.map((u) => {
+              const contador = (u as unknown as { es_contador: boolean }).es_contador
+              return (
+                <article key={u.id} className={`rounded-2xl border border-gray-200 bg-white p-4 ${u.activo ? '' : 'opacity-60'}`}>
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-xs font-semibold text-white">
+                      {u.nombre.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('')}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate font-semibold text-gray-900">{u.nombre}</h3>
+                      <p className="truncate text-xs text-gray-500">@{u.username ?? '—'}{u.correo ? ` · ${u.correo}` : ''}</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${claseNivel(Number(u.nivel))}`}>{nivelLabel[Number(u.nivel)]}</span>
+                        {contador && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">Contador</span>}
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${u.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {u.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="-mr-2 -mt-1 flex shrink-0">
+                      <BotonIcono titulo="Editar usuario" tono="marca" onClick={() => abrirEditUser(u)}><Pencil size={16} /></BotonIcono>
+                      {u.activo && <BotonIcono titulo="Desactivar usuario" tono="peligro" onClick={() => desactivarUsuario(u)}><Trash2 size={16} /></BotonIcono>}
+                    </div>
+                  </div>
+                </article>
+              )
+            })}
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+
+          <div className="hidden overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm shadow-black/[0.02] md:block">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -225,13 +262,7 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
                     <td className="px-4 py-3 text-gray-600 text-xs">{u.username ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{u.correo ?? '—'}</td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        Number(u.nivel) <= 1
-                          ? 'bg-brand-100 text-brand-700'
-                          : Number(u.nivel) === 2
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${claseNivel(Number(u.nivel))}`}>
                         {nivelLabel[Number(u.nivel)]}
                       </span>
                     </td>
@@ -246,23 +277,9 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 justify-end">
-                        <button
-                          onClick={() => abrirEditUser(u)}
-                          title="Editar usuario"
-                          className="p-1.5 rounded-md text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        {u.activo && (
-                          <button
-                            onClick={() => desactivarUsuario(u)}
-                            title="Desactivar usuario"
-                            className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
+                      <div className="flex items-center justify-end">
+                        <BotonIcono titulo="Editar usuario" tono="marca" onClick={() => abrirEditUser(u)}><Pencil size={15} /></BotonIcono>
+                        {u.activo && <BotonIcono titulo="Desactivar usuario" tono="peligro" onClick={() => desactivarUsuario(u)}><Trash2 size={15} /></BotonIcono>}
                       </div>
                     </td>
                   </tr>
@@ -385,8 +402,8 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
 
       {/* ── Modal nuevo usuario ── */}
       {modalUsuario && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 animate-aparecer sm:items-center sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full animate-subir max-h-[92dvh] overflow-y-auto max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold">Nuevo usuario</h2>
               <button onClick={() => setModalUsuario(false)} className="text-gray-400 hover:text-gray-600">✕</button>
@@ -435,8 +452,8 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
 
       {/* ── Modal editar usuario ── */}
       {modalEditUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 animate-aparecer sm:items-center sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full animate-subir max-h-[92dvh] overflow-y-auto max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold">Editar usuario</h2>
               <button onClick={() => setModalEditUser(null)} className="text-gray-400 hover:text-gray-600">✕</button>

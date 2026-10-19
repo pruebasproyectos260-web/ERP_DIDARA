@@ -4,6 +4,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { Plus, Pencil, Trash2, X, ExternalLink, Monitor, Search } from 'lucide-react'
 import { borrar } from '@/lib/api-cliente'
 import { aviso, confirmar } from '@/components/ui/Avisos'
+import { BotonIcono, BotonPrincipal, EncabezadoPagina, EstadoVacio } from '@/components/ui/Pagina'
 
 interface Software {
   id: number
@@ -131,33 +132,27 @@ export default function SoftwareClient({ softwareInit, nivel }: Props) {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2">
-          <Monitor className="text-brand-600" size={22} />
-          <h1 className="text-2xl font-bold text-gray-900">Software</h1>
-          <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-medium">
-            {lista.length}
-          </span>
-        </div>
-        {esAdmin && (
-          <button onClick={abrirNuevo} className={btnPrimary + ' flex items-center gap-1.5'}>
-            <Plus size={15} /> Agregar software
-          </button>
+    <div className="space-y-5">
+      <EncabezadoPagina
+        titulo="Software"
+        subtitulo={`${lista.length} programa${lista.length === 1 ? '' : 's'} para descargar`}
+        acciones={esAdmin && (
+          <BotonPrincipal onClick={abrirNuevo}>
+            <Plus size={17} /> <span>Agregar software</span>
+          </BotonPrincipal>
         )}
-      </div>
+      />
 
       {/* Buscador con autocompletado */}
-      <div ref={busquedaRef} className="relative max-w-md">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+      <div ref={busquedaRef} className="relative max-w-xl">
+        <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
-          placeholder="Buscar software..."
+          placeholder="Buscar software…"
           value={busqueda}
           onChange={(e) => handleBusquedaChange(e.target.value)}
           onFocus={() => busqueda.trim() && setMostrarSug(true)}
-          className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-9 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10"
         />
         {busqueda && (
           <button
@@ -184,76 +179,58 @@ export default function SoftwareClient({ softwareInit, nivel }: Props) {
         )}
       </div>
 
-      {/* Tabla */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {listaFiltrada.length === 0 ? (
-          <div className="text-center py-16 text-gray-400 text-sm">
-            {busqueda ? `Sin resultados para "${busqueda}"` : 'No hay software registrado aún.'}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Nombre del programa</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden sm:table-cell">Descripción</th>
-                  <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Enlace</th>
-                  {esAdmin && <th className="px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Acciones</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {listaFiltrada.map((s) => (
-                  <tr key={s.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-2">
-                        <Monitor size={15} className="text-brand-500 shrink-0" />
-                        <span className="font-medium text-gray-900">{s.nombre}</span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5 text-gray-500 hidden sm:table-cell">
-                      {s.descripcion ?? <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-5 py-3.5 text-center">
-                      <a
-                        href={s.enlace}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg transition-colors"
-                      >
-                        <ExternalLink size={12} />
-                        Descargar
-                      </a>
-                    </td>
-                    {esAdmin && (
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => abrirEditar(s)}
-                            className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            onClick={() => eliminar(s.id, s.nombre)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {/* Catálogo */}
+      {listaFiltrada.length === 0 ? (
+        <div className="rounded-2xl border border-gray-200 bg-white">
+          <EstadoVacio icono={<Monitor size={22} />}
+            titulo={busqueda ? `Sin resultados para “${busqueda}”` : 'No hay software registrado aún'}
+            descripcion={busqueda ? 'Prueba con otro nombre.' : undefined} />
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {listaFiltrada.map((s) => {
+            let dominio = ''
+            try { dominio = new URL(s.enlace).hostname.replace(/^www\./, '') } catch { /* enlace no válido */ }
+            return (
+              <article key={s.id} className="flex flex-col rounded-2xl border border-gray-200 bg-white p-4 shadow-sm shadow-black/[0.02] transition-colors hover:border-brand-300">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+                    <Monitor size={19} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold leading-snug text-gray-900">{s.nombre}</h3>
+                    {dominio && <p className="truncate text-xs text-gray-400">{dominio}</p>}
+                  </div>
+                  {esAdmin && (
+                    <div className="-mr-2 -mt-1 flex shrink-0">
+                      <BotonIcono titulo="Editar" tono="marca" onClick={() => abrirEditar(s)}><Pencil size={15} /></BotonIcono>
+                      <BotonIcono titulo="Eliminar" tono="peligro" onClick={() => eliminar(s.id, s.nombre)}><Trash2 size={15} /></BotonIcono>
+                    </div>
+                  )}
+                </div>
+                {s.descripcion && <p className="mt-2 line-clamp-2 text-sm text-gray-500">{s.descripcion}</p>}
+                {/* Siempre al fondo de la tarjeta, aunque no haya descripción */}
+                <div className="mt-auto pt-4">
+                  <a
+                    href={s.enlace}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-100"
+                  >
+                    <ExternalLink size={14} />
+                    Descargar
+                  </a>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      )}
 
       {/* Modal */}
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 animate-aparecer sm:items-center sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full animate-subir max-h-[92dvh] overflow-y-auto max-w-md">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
               <h2 className="text-base font-semibold text-gray-900">
                 {editando ? 'Editar software' : 'Agregar software'}

@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Plus, Search, Pencil, Trash2, AlertCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, AlertCircle, Package } from 'lucide-react'
 import type { Producto } from '@/types'
 import ProductoModal from './ProductoModal'
 import { borrar } from '@/lib/api-cliente'
 import { aviso, confirmar } from '@/components/ui/Avisos'
+import { BotonIcono, BotonPrincipal, Buscador, EncabezadoPagina, EstadoVacio } from '@/components/ui/Pagina'
 
 interface Props {
   productos: Producto[]
@@ -86,94 +87,129 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
   const puedeVerPrecios = nivel <= 1
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Inventario</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{filtrados.length} producto(s)</p>
-        </div>
-        {puedeAgregar && (
-          <button
-            onClick={() => setModal({ open: true, producto: null })}
-            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            <Plus size={16} /> Nuevo producto
-          </button>
+    <div className="space-y-5">
+      <EncabezadoPagina
+        titulo="Inventario"
+        subtitulo={`${filtrados.length} de ${productos.length} productos`}
+        acciones={puedeAgregar && (
+          <BotonPrincipal onClick={() => setModal({ open: true, producto: null })}>
+            <Plus size={17} /> <span>Nuevo producto</span>
+          </BotonPrincipal>
         )}
-      </div>
+      />
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-3">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total productos</p>
-          <p className="text-2xl font-bold text-brand-600 mt-1">{totalProductos}</p>
+      {/* Resumen (las de stock funcionan como filtro) */}
+      <div className={`grid grid-cols-2 gap-3 ${puedeVerPrecios ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <p className="text-[13px] text-gray-500">Total de productos</p>
+          <p className="mt-1 text-2xl font-semibold tracking-tight text-gray-900">{totalProductos}</p>
         </div>
         <button
           onClick={() => setStockFiltro(prev => prev === 'sinstock' ? null : 'sinstock')}
-          className={`text-left rounded-xl p-4 border transition-colors ${stockFiltro === 'sinstock' ? 'bg-red-50 border-red-400' : 'bg-white border-gray-200 hover:border-red-300'}`}
+          aria-pressed={stockFiltro === 'sinstock'}
+          className={`rounded-2xl border p-4 text-left transition-colors ${stockFiltro === 'sinstock' ? 'border-red-400 bg-red-50 ring-2 ring-red-100' : 'border-gray-200 bg-white hover:border-red-300'}`}
         >
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sin stock</p>
-          <p className={`text-2xl font-bold mt-1 ${sinStock > 0 ? 'text-red-600' : 'text-gray-700'}`}>{sinStock}</p>
+          <p className="text-[13px] text-gray-500">Sin stock</p>
+          <p className={`mt-1 text-2xl font-semibold tracking-tight ${sinStock > 0 ? 'text-red-600' : 'text-gray-900'}`}>{sinStock}</p>
         </button>
         <button
           onClick={() => setStockFiltro(prev => prev === 'bajo' ? null : 'bajo')}
-          className={`text-left rounded-xl p-4 border transition-colors ${stockFiltro === 'bajo' ? 'bg-amber-50 border-amber-400' : 'bg-white border-gray-200 hover:border-amber-300'}`}
+          aria-pressed={stockFiltro === 'bajo'}
+          className={`rounded-2xl border p-4 text-left transition-colors ${stockFiltro === 'bajo' ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-100' : 'border-gray-200 bg-white hover:border-amber-300'}`}
         >
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Stock bajo (≤mín)</p>
-          <p className={`text-2xl font-bold mt-1 ${stockBajo > 0 ? 'text-amber-600' : 'text-gray-700'}`}>{stockBajo}</p>
+          <p className="text-[13px] text-gray-500">Stock bajo (≤ mínimo)</p>
+          <p className={`mt-1 text-2xl font-semibold tracking-tight ${stockBajo > 0 ? 'text-amber-600' : 'text-gray-900'}`}>{stockBajo}</p>
         </button>
         {puedeVerPrecios && (
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Valor de inventario</p>
-            <p className="text-xl font-bold text-green-600 mt-1">{fmt$(valorInventario)}</p>
+          <div className="rounded-2xl border border-gray-200 bg-white p-4">
+            <p className="text-[13px] text-gray-500">Valor de inventario</p>
+            <p className="mt-1 truncate text-xl font-semibold tracking-tight text-green-700">{fmt$(valorInventario)}</p>
           </div>
         )}
       </div>
 
-      {/* Búsqueda */}
-      <div className="relative">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          value={busqueda}
-          onChange={e => setBusqueda(e.target.value)}
-          placeholder="Buscar por ID, nombre o descripción..."
-          className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-        />
-      </div>
+      <Buscador valor={busqueda} onCambio={setBusqueda} placeholder="Buscar por código, nombre o descripción…" />
 
-      {/* Filtros por categoría */}
+      {/* Filtros por categoría: desplazables de lado en celular */}
       {categorias.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          <span className="text-xs text-gray-500 self-center font-medium">Categorías:</span>
-          {categorias.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setCategoriaFiltro(prev => prev === cat ? '' : cat)}
-              className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${
-                categoriaFiltro === cat
-                  ? 'bg-brand-600 text-white border-brand-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-brand-400'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-          {categoriaFiltro && (
-            <button
-              onClick={() => setCategoriaFiltro('')}
-              className="text-xs px-3 py-1.5 rounded-full font-medium border border-red-300 text-red-600 hover:bg-red-50"
-            >
-              ✕ Limpiar
-            </button>
-          )}
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <div className="flex w-max gap-2 sm:w-auto sm:flex-wrap">
+            {categoriaFiltro && (
+              <button onClick={() => setCategoriaFiltro('')}
+                className="whitespace-nowrap rounded-full border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
+                ✕ Quitar filtro
+              </button>
+            )}
+            {categorias.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setCategoriaFiltro(prev => prev === cat ? '' : cat)}
+                aria-pressed={categoriaFiltro === cat}
+                className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  categoriaFiltro === cat
+                    ? 'border-brand-600 bg-brand-600 text-white'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-brand-400'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Tabla */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm min-w-[900px]">
+      {filtrados.length === 0 && (
+        <div className="rounded-2xl border border-gray-200 bg-white">
+          <EstadoVacio icono={<Package size={22} />} titulo="No se encontraron productos"
+            descripcion="Prueba con otra búsqueda o quita los filtros." />
+        </div>
+      )}
+
+      {/* Celular, tableta y laptop: tarjetas */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:hidden">
+        {filtrados.map((p) => {
+          const cats = (p.categorias ?? p.categoria ?? '').split(';').map(c => c.trim()).filter(Boolean)
+          const estadoStock = p.stock === 0 ? 'bg-red-100 text-red-700' : esBajoStock(p) ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+          return (
+            <article key={p.id} className="flex gap-3 rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm shadow-black/[0.02]">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-white">
+                {p.imagen_url
+                  ? <img src={p.imagen_url} alt="" loading="lazy" className="h-full w-full object-contain"
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  : <Package size={22} className="text-gray-300" />}
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-mono text-[11px] font-semibold text-brand-700">{p.codigo ?? `#${p.id}`}</span>
+                  <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${estadoStock}`}>
+                    {(p.stock === 0 || esBajoStock(p)) && <AlertCircle size={11} />}
+                    {p.stock} {p.unidad}
+                  </span>
+                </div>
+                <h3 className="mt-0.5 line-clamp-2 text-sm font-medium leading-snug text-gray-900">{p.nombre}</h3>
+                {cats.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {cats.slice(0, 3).map(c => <span key={c} className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">{c}</span>)}
+                  </div>
+                )}
+                <div className="mt-auto flex items-end justify-between pt-1">
+                  {puedeVerPrecios
+                    ? <span className="text-sm font-semibold text-green-700">{fmt$(p.precio_venta)}</span>
+                    : <span />}
+                  <div className="-mb-1.5 -mr-1.5 flex">
+                    {puedeEditar && <BotonIcono titulo="Editar" tono="marca" onClick={() => setModal({ open: true, producto: p })}><Pencil size={16} /></BotonIcono>}
+                    {puedeEliminar && <BotonIcono titulo="Eliminar" tono="peligro" onClick={() => eliminar(p.id)}><Trash2 size={16} /></BotonIcono>}
+                  </div>
+                </div>
+              </div>
+            </article>
+          )
+        })}
+      </div>
+
+      {/* Pantalla ancha: tabla */}
+      <div className={`hidden overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm shadow-black/[0.02] ${filtrados.length ? 'xl:block' : ''}`}>
+        <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="text-left px-3 py-2.5 font-medium text-gray-500 text-xs uppercase">ID</th>
@@ -281,19 +317,9 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
 
                   {/* Acciones */}
                   <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-1 justify-end">
-                      {puedeEditar && (
-                        <button onClick={() => setModal({ open: true, producto: p })}
-                          className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">
-                          <Pencil size={13} />
-                        </button>
-                      )}
-                      {puedeEliminar && (
-                        <button onClick={() => eliminar(p.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                          <Trash2 size={13} />
-                        </button>
-                      )}
+                    <div className="flex items-center justify-end">
+                      {puedeEditar && <BotonIcono titulo="Editar" tono="marca" onClick={() => setModal({ open: true, producto: p })}><Pencil size={15} /></BotonIcono>}
+                      {puedeEliminar && <BotonIcono titulo="Eliminar" tono="peligro" onClick={() => eliminar(p.id)}><Trash2 size={15} /></BotonIcono>}
                     </div>
                   </td>
                 </tr>

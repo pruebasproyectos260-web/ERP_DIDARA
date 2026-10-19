@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Plus, ChevronLeft, ChevronRight, Pencil, Trash2, Trash, Bell } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { borrar } from '@/lib/api-cliente'
+import { BotonIcono, BotonPrincipal, EncabezadoPagina } from '@/components/ui/Pagina'
 import type { Evento, Cliente, Usuario } from '@/types'
 import { aviso, confirmar } from '@/components/ui/Avisos'
 
@@ -100,24 +101,37 @@ export default function AgendaPage() {
   const [responsablesSeleccionados, setResponsablesSeleccionados] = useState<string[]>([])
 
   // Modal notificaciones
-  const [modalNotif, setModalNotif] = useState(false)
-  const [eventosProximos, setEventosProximos] = useState<Evento[]>([])
-  const [notifMostrada, setNotifMostrada] = useState(false)
+  const [modalNotifManual, setModalNotifManual] = useState(false)
+  const [notifDescartada, setNotifDescartada] = useState(false)
 
-  const cargarEventos = useCallback(async (fechaMes: Date) => {
-    setLoading(true)
-    const desde = primerDiaMes(fechaMes).toISOString()
-    const hasta = ultimoDiaMes(fechaMes).toISOString()
-    const res = await fetch(`/api/agenda?desde=${desde}&hasta=${hasta}`)
-    const json = await res.json()
-    setEventos(json.data ?? [])
-    setLoading(false)
-  }, [])
-
-  // Carga inicial: eventos, clientes, usuarios, usuario actual
+  // Eventos del mes visible: se piden al cambiar de mes (el "cargando" se activa en cambiarMes)
   useEffect(() => {
-    cargarEventos(mes)
+    let cancelado = false
+    const desde = primerDiaMes(mes).toISOString()
+    const hasta = ultimoDiaMes(mes).toISOString()
+    fetch(`/api/agenda?desde=${desde}&hasta=${hasta}`)
+      .then(r => r.json())
+      .then(json => { if (!cancelado) setEventos(json.data ?? []) })
+      .catch(() => { if (!cancelado) aviso.error('No se pudieron cargar los eventos') })
+      .finally(() => { if (!cancelado) setLoading(false) })
+    return () => { cancelado = true }
+  }, [mes])
 
+  function cambiarMes(delta: number) {
+    setLoading(true)
+    setMes(new Date(mes.getFullYear(), mes.getMonth() + delta, 1))
+  }
+
+  function irAHoy() {
+    if (mes.getMonth() !== hoy.getMonth() || mes.getFullYear() !== hoy.getFullYear()) {
+      setLoading(true)
+      setMes(new Date(hoy.getFullYear(), hoy.getMonth(), 1))
+    }
+    setDiaSeleccionado(hoy)
+  }
+
+  // Carga inicial: clientes, usuarios y usuario actual
+  useEffect(() => {
     fetch('/api/clientes')
       .then(r => r.json())
       .then(j => setClientes(j.data ?? []))
@@ -134,29 +148,25 @@ export default function AgendaPage() {
           if (yo) setUsuarioActual(yo)
         })
     })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    if (mes) cargarEventos(mes)
-  }, [mes, cargarEventos])
-
-  // Mostrar modal de notificaciones (solo una vez por sesión)
-  useEffect(() => {
-    if (!usuarioActual || eventos.length === 0 || notifMostrada) return
+  // Eventos del usuario en los próximos 3 días (se muestran una vez al entrar)
+  const eventosProximos = useMemo(() => {
+    if (!usuarioActual) return []
     const ahora = new Date()
     const en3Dias = new Date(ahora.getTime() + 3 * 24 * 60 * 60 * 1000)
-    const proximos = eventos.filter(ev => {
+    return eventos.filter(ev => {
       const f = new Date(ev.fecha_inicio)
       return f >= ahora && f <= en3Dias &&
         ev.responsables?.split(',').map(n => n.trim()).includes(usuarioActual.nombre)
     })
-    if (proximos.length > 0) {
-      setEventosProximos(proximos)
-      setModalNotif(true)
-      setNotifMostrada(true)
-    }
-  }, [usuarioActual, eventos, notifMostrada])
+  }, [usuarioActual, eventos])
+
+  const modalNotif = modalNotifManual || (eventosProximos.length > 0 && !notifDescartada)
+  function cerrarNotif() {
+    setModalNotifManual(false)
+    setNotifDescartada(true)
+  }
 
   // Construir grid del mes
   const primerDia = primerDiaMes(mes)
@@ -272,75 +282,63 @@ export default function AgendaPage() {
     )
   }
 
+  const etiquetaDia = diaSeleccionado.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
+
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Agenda</h1>
-        <div className="flex items-center gap-2">
+    <div className="space-y-5">
+      <EncabezadoPagina
+        titulo="Agenda"
+        subtitulo={`${eventos.length} evento${eventos.length === 1 ? '' : 's'} en ${MESES[mes.getMonth()].toLowerCase()}`}
+        acciones={<>
           {eventosProximos.length > 0 && (
             <button
-              onClick={() => setModalNotif(true)}
-              className="relative flex items-center gap-1.5 text-xs text-brand-600 border border-brand-300 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
+              onClick={() => setModalNotifManual(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2.5 text-sm font-medium text-brand-700 hover:bg-brand-100"
             >
-              <Bell size={13} />
-              {eventosProximos.length} próximo{eventosProximos.length > 1 ? 's' : ''}
+              <Bell size={15} />
+              {eventosProximos.length}<span className="hidden sm:inline"> próximo{eventosProximos.length > 1 ? 's' : ''}</span>
             </button>
           )}
-          <button
-            onClick={limpiarMesAnterior}
-            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-red-600 border border-gray-300 hover:border-red-300 px-3 py-1.5 rounded-lg transition-colors"
-            title="Eliminar eventos del mes anterior"
-          >
-            <Trash size={13} />
-            Limpiar mes anterior
-          </button>
-          <button
-            onClick={abrirNuevo}
-            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            <Plus size={16} />
-            Nuevo evento
-          </button>
-        </div>
-      </div>
+          <BotonIcono titulo="Eliminar los eventos del mes anterior" tono="peligro" onClick={limpiarMesAnterior}
+            className="border border-gray-200 bg-white !p-2.5">
+            <Trash size={16} />
+          </BotonIcono>
+          <BotonPrincipal onClick={abrirNuevo}>
+            <Plus size={17} /> <span className="hidden sm:inline">Nuevo evento</span><span className="sm:hidden">Nuevo</span>
+          </BotonPrincipal>
+        </>}
+      />
 
-      {/* Calendario */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {/* Navegación del mes */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-          <button
-            onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}
-            className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <h2 className="font-semibold text-gray-900">
-            {MESES[mes.getMonth()]} {mes.getFullYear()}
-          </h2>
-          <button
-            onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}
-            className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </div>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+        {/* Calendario */}
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm shadow-black/[0.02]">
+          {/* Navegación del mes */}
+          <div className="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-3 sm:px-4">
+            <div className="flex items-center gap-1">
+              <BotonIcono titulo="Mes anterior" onClick={() => cambiarMes(-1)}><ChevronLeft size={18} /></BotonIcono>
+              <BotonIcono titulo="Mes siguiente" onClick={() => cambiarMes(1)}><ChevronRight size={18} /></BotonIcono>
+            </div>
+            <h2 className="font-semibold text-gray-900">
+              {MESES[mes.getMonth()]} {mes.getFullYear()}
+            </h2>
+            <button onClick={irAHoy}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
+              Hoy
+            </button>
+          </div>
 
-        {/* Días de la semana */}
-        <div className="grid grid-cols-7 border-b border-gray-200">
-          {DIAS_SEMANA.map(d => (
-            <div key={d} className="py-2 text-center text-xs font-medium text-gray-500">{d}</div>
-          ))}
-        </div>
+          {/* Días de la semana */}
+          <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
+            {DIAS_SEMANA.map(d => (
+              <div key={d} className="py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-500">{d}</div>
+            ))}
+          </div>
 
-        {/* Grid de días */}
-        {loading ? (
-          <div className="py-12 text-center text-gray-400 text-sm">Cargando...</div>
-        ) : (
-          <div className="grid grid-cols-7">
+          {/* Grid de días */}
+          <div className={`grid grid-cols-7 transition-opacity ${loading ? 'opacity-50' : ''}`} aria-busy={loading}>
             {celdas.map((dia, i) => {
               if (!dia) {
-                return <div key={`empty-${i}`} className="h-16 border-b border-r border-gray-100 bg-gray-50/50" />
+                return <div key={`empty-${i}`} className="h-14 border-b border-r border-gray-100 bg-gray-50/60 sm:h-24" />
               }
               const esHoy = mismaFecha(dia, hoy)
               const esSeleccionado = mismaFecha(dia, diaSeleccionado)
@@ -351,107 +349,97 @@ export default function AgendaPage() {
                   key={dia.toISOString()}
                   onClick={() => setDiaSeleccionado(dia)}
                   onDoubleClick={() => { setDiaSeleccionado(dia); abrirNuevo() }}
-                  className={`h-16 border-b border-r border-gray-100 flex flex-col items-center pt-2 gap-0.5 transition-colors ${
+                  aria-label={`${dia.getDate()} de ${MESES[dia.getMonth()]}, ${eventosDelDia.length} evento(s)`}
+                  aria-pressed={esSeleccionado}
+                  className={`flex h-14 flex-col items-center gap-1 border-b border-r border-gray-100 p-1 transition-colors sm:h-24 sm:items-stretch sm:p-1.5 ${
                     esSeleccionado ? 'bg-brand-50' : 'hover:bg-gray-50'
-                  } ${esPasado && !esHoy ? 'opacity-50' : ''}`}
+                  }`}
                 >
                   <span
-                    className={`text-sm font-medium w-7 h-7 flex items-center justify-center rounded-full ${
-                      esHoy
-                        ? 'bg-brand-600 text-white'
-                        : esSeleccionado
-                        ? 'text-brand-600'
-                        : 'text-gray-700'
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-medium sm:self-end ${
+                      esHoy ? 'bg-brand-600 text-white'
+                      : esSeleccionado ? 'text-brand-700 ring-2 ring-brand-300'
+                      : esPasado ? 'text-gray-400' : 'text-gray-700'
                     }`}
                   >
                     {dia.getDate()}
                   </span>
-                  {/* Emojis de eventos */}
-                  <div className="flex flex-wrap justify-center gap-0.5 leading-none">
+                  {/* Celular: puntos de color */}
+                  <div className="flex gap-0.5 sm:hidden">
+                    {eventosDelDia.slice(0, 3).map(ev => (
+                      <span key={ev.id} className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ev.color ?? '#187d78' }} />
+                    ))}
+                  </div>
+                  {/* Escritorio: títulos */}
+                  <div className="hidden min-w-0 space-y-0.5 sm:block">
                     {eventosDelDia.slice(0, 2).map(ev => (
-                      <span key={ev.id} className="text-xs leading-none">{getEmoji(ev.tipo)}</span>
+                      <span key={ev.id}
+                        className={`block truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium text-white ${esPasado && !esHoy ? 'opacity-60' : ''}`}
+                        style={{ backgroundColor: ev.color ?? '#187d78' }}>
+                        {getEmoji(ev.tipo)} {ev.titulo}
+                      </span>
                     ))}
                     {eventosDelDia.length > 2 && (
-                      <span className="text-xs text-gray-400 leading-none">+{eventosDelDia.length - 2}</span>
+                      <span className="block px-1 text-left text-[11px] text-gray-500">+{eventosDelDia.length - 2} más</span>
                     )}
                   </div>
                 </button>
               )
             })}
           </div>
-        )}
-      </div>
-
-      {/* Lista de eventos del día seleccionado */}
-      <div className="bg-white rounded-xl border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="font-medium text-gray-900 capitalize">
-            {diaSeleccionado.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}
-          </h3>
-          <span className="text-xs text-gray-400">{eventosDia.length} evento{eventosDia.length !== 1 ? 's' : ''}</span>
         </div>
-        {eventosDia.length === 0 ? (
-          <div className="py-8 text-center text-gray-400 text-sm">
-            No hay eventos este día.{' '}
-            <button onClick={abrirNuevo} className="text-brand-600 hover:underline">Agregar uno</button>
+
+        {/* Eventos del día seleccionado */}
+        <div className="rounded-2xl border border-gray-200 bg-white shadow-sm shadow-black/[0.02] lg:sticky lg:top-4">
+          <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+            <h3 className="font-semibold text-gray-900 first-letter:uppercase">{etiquetaDia}</h3>
+            <span className="text-xs text-gray-400">{eventosDia.length} evento{eventosDia.length !== 1 ? 's' : ''}</span>
           </div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {eventosDia.map(ev => {
-              const cliente = ev.cliente as { nombre: string } | undefined
-              const tipoInfo = TIPOS_EVENTO.find(t => t.valor === ev.tipo)
-              return (
-                <div key={ev.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl leading-none mt-0.5">{tipoInfo?.emoji ?? '•'}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {!ev.todo_el_dia && (
-                        <span className="text-sm font-medium text-gray-500 shrink-0">
-                          {formatHora(ev.fecha_inicio)}
-                          {ev.fecha_fin ? ` – ${formatHora(ev.fecha_fin)}` : ''}
-                        </span>
+          {eventosDia.length === 0 ? (
+            <div className="px-4 py-10 text-center text-sm text-gray-400">
+              No hay eventos este día.
+              <button onClick={abrirNuevo} className="mt-2 block w-full font-medium text-brand-700 hover:underline">+ Agregar uno</button>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {eventosDia.map(ev => {
+                const cliente = ev.cliente as { nombre: string } | undefined
+                const tipoInfo = TIPOS_EVENTO.find(t => t.valor === ev.tipo)
+                return (
+                  <div key={ev.id} className="relative flex items-start gap-3 py-3 pl-5 pr-2">
+                    <span className="absolute inset-y-3 left-0 w-1 rounded-r-full" style={{ backgroundColor: ev.color ?? '#187d78' }} />
+                    <span className="mt-0.5 text-xl leading-none">{tipoInfo?.emoji ?? '•'}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium leading-snug text-gray-900">{ev.titulo}</p>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+                        <span>{ev.todo_el_dia ? 'Todo el día' : `${formatHora(ev.fecha_inicio)}${ev.fecha_fin ? ` – ${formatHora(ev.fecha_fin)}` : ''}`}</span>
+                        {ev.estado && (
+                          <span className={`rounded-full px-2 py-0.5 font-medium ${estadoColors[ev.estado] ?? 'bg-gray-100 text-gray-600'}`}>{ev.estado}</span>
+                        )}
+                      </div>
+                      {(cliente || ev.lugar || ev.responsables) && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          {[cliente?.nombre, ev.lugar, ev.responsables ? `👤 ${ev.responsables}` : ''].filter(Boolean).join(' · ')}
+                        </p>
                       )}
-                      <p className="font-medium text-gray-900 truncate">{ev.titulo}</p>
-                      {ev.estado && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${estadoColors[ev.estado] ?? 'bg-gray-100 text-gray-600'}`}>
-                          {ev.estado}
-                        </span>
-                      )}
+                      {ev.descripcion && <p className="mt-1 line-clamp-2 text-xs text-gray-400">{ev.descripcion}</p>}
                     </div>
-                    {(cliente || ev.lugar || ev.responsables) && (
-                      <p className="text-xs text-gray-500 mt-0.5 truncate">
-                        {[cliente?.nombre, ev.lugar, ev.responsables ? `👤 ${ev.responsables}` : ''].filter(Boolean).join(' · ')}
-                      </p>
-                    )}
-                    {ev.descripcion && (
-                      <p className="text-xs text-gray-400 mt-0.5 truncate">{ev.descripcion}</p>
-                    )}
+                    <div className="flex shrink-0">
+                      <BotonIcono titulo="Editar" tono="marca" onClick={() => abrirEditar(ev)}><Pencil size={15} /></BotonIcono>
+                      <BotonIcono titulo="Eliminar" tono="peligro" onClick={() => eliminar(ev.id)}><Trash2 size={15} /></BotonIcono>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => abrirEditar(ev)}
-                      className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      onClick={() => eliminar(ev.id)}
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Modal nuevo/editar evento */}
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 animate-aparecer sm:items-center sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full animate-subir max-w-lg flex flex-col max-h-[92dvh] sm:max-h-[90vh]">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
               <h2 className="text-lg font-semibold">
                 {editando ? 'Editar evento' : 'Nuevo evento'}
@@ -647,14 +635,14 @@ export default function AgendaPage() {
 
       {/* Modal notificaciones próximos 3 días */}
       {modalNotif && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 animate-aparecer sm:items-center sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full animate-subir max-h-[92dvh] overflow-y-auto max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <div className="flex items-center gap-2">
                 <Bell size={18} className="text-brand-600" />
                 <h2 className="text-lg font-semibold">Tus próximos eventos</h2>
               </div>
-              <button onClick={() => setModalNotif(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={cerrarNotif} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
             <div className="px-6 py-4 space-y-3">
               <p className="text-sm text-gray-500">Tienes {eventosProximos.length} evento{eventosProximos.length > 1 ? 's' : ''} en los próximos 3 días:</p>
@@ -685,7 +673,7 @@ export default function AgendaPage() {
             </div>
             <div className="px-6 pb-4">
               <button
-                onClick={() => setModalNotif(false)}
+                onClick={cerrarNotif}
                 className="w-full px-4 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 rounded-lg"
               >
                 Entendido
