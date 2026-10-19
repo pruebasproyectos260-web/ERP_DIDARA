@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { requireNivel } from '@/lib/auth'
+import { NIVEL } from '@/lib/nivel'
+import { CAMPOS, leerJson, pick } from '@/lib/campos'
+import { registrarActividad } from '@/lib/actividad'
 
 export async function GET(req: NextRequest) {
-  const supabase = createServiceClient()
+  const auth = await requireNivel(NIVEL.ESTANDAR)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { searchParams } = new URL(req.url)
   const mes = searchParams.get('mes')   // '1'-'12'
   const anio = searchParams.get('anio') // '2026'
@@ -24,13 +29,18 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = createServiceClient()
-  const body = await req.json()
+  const auth = await requireNivel(NIVEL.ESTANDAR)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
+  const body = pick(await leerJson(req), CAMPOS.gastos_variables)
+
+  // Quién registró el gasto lo define la sesión, no el navegador
   const { data, error } = await supabase
     .from('gastos_variables')
-    .insert(body)
+    .insert({ ...body, registrado_por: auth.nombre || null })
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await registrarActividad(auth, 'crear', 'gastos_variables', data.id, `${data.tipo} $${data.monto} (${data.fecha})`)
   return NextResponse.json({ data }, { status: 201 })
 }

@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { requireNivel } from '@/lib/auth'
+import { NIVEL } from '@/lib/nivel'
+import { CAMPOS, leerJson, pick } from '@/lib/campos'
+
+// Endpoint legado: Gastos usa /api/gastos-fijos y /api/gastos-variables.
 
 export async function GET(req: NextRequest) {
-  const supabase = createServiceClient()
+  const auth = await requireNivel(NIVEL.ADMIN)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { searchParams } = new URL(req.url)
   const tipo = searchParams.get('tipo') ?? ''
 
@@ -19,14 +25,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const authClient = await createClient()
-  const supabase = createServiceClient()
-  const body = await req.json()
-  const { data: { user } } = await authClient.auth.getUser()
+  const auth = await requireNivel(NIVEL.ADMIN)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
+  const body = pick(await leerJson(req), CAMPOS.gastos)
 
   const { data, error } = await supabase
     .from('gastos')
-    .insert({ ...body, created_by: user!.id })
+    .insert({ ...body, created_by: auth.userId })
     .select()
     .single()
 

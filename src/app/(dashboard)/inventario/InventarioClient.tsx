@@ -4,22 +4,27 @@ import { useState, useMemo } from 'react'
 import { Plus, Search, Pencil, Trash2, AlertCircle } from 'lucide-react'
 import type { Producto } from '@/types'
 import ProductoModal from './ProductoModal'
+import { borrar } from '@/lib/api-cliente'
 
 interface Props {
   productos: Producto[]
   ivaDefault: number
   nivel: number
+  filtroInicial?: 'sinstock' | 'bajo' | null
 }
+
+// Bajo stock = hay existencias pero ya llegó a su mínimo (los de mínimo 0 no generan alerta)
+const esBajoStock = (p: Producto) => p.stock > 0 && p.stock_minimo > 0 && p.stock <= p.stock_minimo
 
 function fmt$(n: number) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
 }
 
-export default function InventarioClient({ productos: inicial, ivaDefault, nivel }: Props) {
+export default function InventarioClient({ productos: inicial, ivaDefault, nivel, filtroInicial = null }: Props) {
   const [productos, setProductos] = useState<Producto[]>(inicial)
   const [busqueda, setBusqueda] = useState('')
   const [categoriaFiltro, setCategoriaFiltro] = useState('')
-  const [stockFiltro, setStockFiltro] = useState<'sinstock' | 'bajo' | null>(null)
+  const [stockFiltro, setStockFiltro] = useState<'sinstock' | 'bajo' | null>(filtroInicial)
   const [modal, setModal] = useState<{ open: boolean; producto: Producto | null }>({ open: false, producto: null })
 
   // Categorías únicas de todos los productos
@@ -47,7 +52,7 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
         const matchStock =
           !stockFiltro ||
           (stockFiltro === 'sinstock' && p.stock === 0) ||
-          (stockFiltro === 'bajo' && p.stock > 0 && p.stock <= p.stock_minimo)
+          (stockFiltro === 'bajo' && esBajoStock(p))
         return matchQ && matchCat && matchStock
       })
   }, [productos, busqueda, categoriaFiltro, stockFiltro])
@@ -55,12 +60,12 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
   // Stats
   const totalProductos = productos.length
   const sinStock = productos.filter(p => p.stock === 0).length
-  const stockBajo = productos.filter(p => p.stock > 0 && p.stock <= 5).length
-  const valorInventario = productos.reduce((acc, p) => acc + p.precio_compra_neto * p.stock, 0)
+  const stockBajo = productos.filter(esBajoStock).length
+  const valorInventario = productos.reduce((acc, p) => acc + (p.precio_compra_neto ?? 0) * p.stock, 0)
 
   async function eliminar(id: number) {
     if (!confirm('¿Eliminar este producto?')) return
-    await fetch(`/api/inventario/${id}`, { method: 'DELETE' })
+    if (!(await borrar(`/api/inventario/${id}`, 'No se pudo eliminar el producto'))) return
     setProductos(prev => prev.filter(p => p.id !== id))
   }
 

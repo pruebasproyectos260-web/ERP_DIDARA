@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { NIVEL } from '@/lib/nivel'
+import { ocultarCostosCotizacion, ocultarCostosProducto } from '@/lib/campos'
 import CotizacionesClient from './CotizacionesClient'
 
 export default async function CotizacionesPage() {
@@ -27,13 +29,17 @@ export default async function CotizacionesPage() {
     .eq('id', user!.id)
     .single()
 
+  const nivel = perfil?.nivel ?? 2
+  // El nivel 3 no debe recibir costos ni ganancias, aunque la UI ya no los muestre
+  const restringido = nivel >= NIVEL.RESTRINGIDO
+
   return (
     <CotizacionesClient
-      cotizaciones={cotizaciones ?? []}
+      cotizaciones={restringido ? (cotizaciones ?? []).map(ocultarCostosCotizacion) : cotizaciones ?? []}
       clientes={clientes ?? []}
-      productos={productos ?? []}
+      productos={restringido ? (productos ?? []).map(ocultarCostosProducto) : productos ?? []}
       ivaDefault={configData?.iva_porcentaje ?? 16}
-      nivel={perfil?.nivel ?? 2}
+      nivel={nivel}
       esContador={perfil?.es_contador ?? false}
     />
   )

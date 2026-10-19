@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { requireNivel } from '@/lib/auth'
+import { NIVEL } from '@/lib/nivel'
+import { CAMPOS, leerJson, ocultarCostosCotizacion, pick, pickItems } from '@/lib/campos'
+import { escaparHtml } from '@/lib/html'
+import { reemplazarPartidas } from '@/lib/partidas'
+import { registrarActividad } from '@/lib/actividad'
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireNivel()
+  if (auth instanceof NextResponse) return auth
+  const { supabase, nivel } = auth
   const { id } = await params
-  const supabase = createServiceClient()
 
   const { data, error } = await supabase
     .from('cotizaciones')
@@ -15,17 +22,27 @@ export async function GET(
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 404 })
-  return NextResponse.json({ data })
+  return NextResponse.json({ data: nivel >= NIVEL.RESTRINGIDO ? ocultarCostosCotizacion(data) : data })
 }
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireNivel(NIVEL.ESTANDAR)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { id } = await params
-  const supabase = createServiceClient()
-  const body = await req.json()
-  const { items, ...cotizacionData } = body
+  const body = await leerJson(req)
+  const cotizacionData = pick(body, CAMPOS.cotizaciones)
+  const items = pickItems(body.items, CAMPOS.cotizacion_items)
+
+  // Estado anterior: el correo al contador solo sale cuando CAMBIA a "aceptada"
+  const { data: previa } = await supabase
+    .from('cotizaciones')
+    .select('estado, folio')
+    .eq('id', id)
+    .single()
 
   const { error } = await supabase
     .from('cotizaciones')
@@ -36,12 +53,8 @@ export async function PATCH(
 
   // Reemplazar items si se envían
   if (items !== undefined) {
-    await supabase.from('cotizacion_items').delete().eq('cotizacion_id', id)
-    if (items.length > 0) {
-      await supabase.from('cotizacion_items').insert(
-        items.map((item: Record<string, unknown>) => ({ ...item, cotizacion_id: id }))
-      )
-    }
+    const errorPartidas = await reemplazarPartidas(supabase, 'cotizacion_items', 'cotizacion_id', id, items)
+    if (errorPartidas) return NextResponse.json({ error: errorPartidas }, { status: 500 })
   }
 
   const { data: completa } = await supabase
@@ -50,14 +63,24 @@ export async function PATCH(
     .eq('id', id)
     .single()
 
+  if (previa) {
+    const cambioEstado = cotizacionData.estado !== undefined && cotizacionData.estado !== previa.estado
+    await registrarActividad(
+      auth,
+      cambioEstado ? 'cambiar_estado' : 'editar',
+      'cotizaciones',
+      id,
+      cambioEstado ? `${previa.folio}: ${previa.estado} → ${cotizacionData.estado}` : previa.folio,
+    )
+  }
+
   // Auto-email a contadores cuando la cotización pasa a "aceptada" con IVA
-  if (body.estado === 'aceptada' && completa) {
+  if (cotizacionData.estado === 'aceptada' && previa?.estado !== 'aceptada' && completa) {
     const cot = completa as { folio: string; cliente_nombre?: string; aplica_iva: boolean; iva_monto: number; total: number; cliente?: { nombre: string } }
     const aplica = cot.aplica_iva && Number(cot.iva_monto) > 0
     if (aplica) {
       try {
-        const svc = createServiceClient()
-        const { data: contadores } = await svc
+        const { data: contadores } = await supabase
           .from('usuarios')
           .select('correo, nombre')
           .eq('es_contador', true)
@@ -72,8 +95,8 @@ export async function PATCH(
             asunto: `Solicitud de Factura — ${cot.folio}`,
             html: `
               <h2 style="color:#1a7a6e">Solicitud de Factura</h2>
-              <p>La cotización <strong>${cot.folio}</strong> del cliente
-                 <strong>${clienteNombre}</strong> ha sido marcada como <strong>Aceptada</strong>.</p>
+              <p>La cotización <strong>${escaparHtml(cot.folio)}</strong> del cliente
+                 <strong>${escaparHtml(clienteNombre)}</strong> ha sido marcada como <strong>Aceptada</strong>.</p>
               <table cellpadding="6" style="border-collapse:collapse;margin-top:12px">
                 <tr><td style="color:#555">IVA:</td><td><strong>${fmtMXN(Number(cot.iva_monto))}</strong></td></tr>
                 <tr><td style="color:#555">Total:</td><td><strong>${fmtMXN(Number(cot.total))}</strong></td></tr>
@@ -95,10 +118,13 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireNivel(NIVEL.ADMIN)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { id } = await params
-  const supabase = createServiceClient()
 
-  const { error } = await supabase.from('cotizaciones').delete().eq('id', id)
+  const { data: borradas, error } = await supabase.from('cotizaciones').delete().eq('id', id).select('folio')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (borradas?.length) await registrarActividad(auth, 'eliminar', 'cotizaciones', id, borradas[0].folio)
   return NextResponse.json({ ok: true })
 }

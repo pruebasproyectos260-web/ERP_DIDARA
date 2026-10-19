@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { requireNivel } from '@/lib/auth'
+import { NIVEL } from '@/lib/nivel'
+import { CAMPOS, leerJson, pick } from '@/lib/campos'
+import { registrarActividad } from '@/lib/actividad'
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireNivel(NIVEL.ADMIN)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { id } = await params
-  const supabase = createServiceClient()
-  const body = await req.json()
+  const body = pick(await leerJson(req), CAMPOS.gastos_fijos)
 
   const { data, error } = await supabase
     .from('gastos_fijos')
@@ -16,6 +21,7 @@ export async function PATCH(
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await registrarActividad(auth, 'editar', 'gastos_fijos', id, `${data.nombre}: $${data.monto}/mes`)
 
   if (body.fecha_inicio || body.monto !== undefined) {
     const { data: gf } = await supabase.from('gastos_fijos').select('fecha_inicio, monto').eq('id', id).single()
@@ -40,9 +46,13 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireNivel(NIVEL.ADMIN)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { id } = await params
-  const supabase = createServiceClient()
-  const { error } = await supabase.from('gastos_fijos').delete().eq('id', id)
+
+  const { data: borrados, error } = await supabase.from('gastos_fijos').delete().eq('id', id).select('nombre, monto')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (borrados?.length) await registrarActividad(auth, 'eliminar', 'gastos_fijos', id, `${borrados[0].nombre}: $${borrados[0].monto}/mes`)
   return NextResponse.json({ ok: true })
 }

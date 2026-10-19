@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { TrendingUp, TrendingDown, Users, FileText, Wrench, RefreshCw } from 'lucide-react'
 import {
   Chart as ChartJS,
@@ -34,6 +35,7 @@ interface Props {
   totalClientes: number
   reportesAbiertos: number
   productosBajoStock: { id: number; nombre: string; stock: number; stock_minimo: number; unidad: string }[]
+  totalBajoStock: number
   nombre: string
 }
 
@@ -46,7 +48,7 @@ function isMesKey(fecha: string, mesKey: string): boolean {
   return (fecha ?? '').slice(0, 7) === mesKey
 }
 
-export default function DashboardClient({ nivel, totalClientes, reportesAbiertos, productosBajoStock, nombre }: Props) {
+export default function DashboardClient({ nivel, totalClientes, reportesAbiertos, productosBajoStock, totalBajoStock, nombre }: Props) {
   const now = new Date()
   const [mes,  setMes]  = useState(now.getMonth() + 1)
   const [anio, setAnio] = useState(now.getFullYear())
@@ -251,18 +253,29 @@ export default function DashboardClient({ nivel, totalClientes, reportesAbiertos
       {/* Productos bajo stock */}
       {productosBajoStock.length > 0 && (
         <div className="bg-white rounded-xl border border-orange-200 p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-            <h2 className="font-semibold text-gray-900 text-sm">Productos con bajo stock</h2>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+              <h2 className="font-semibold text-gray-900 text-sm">Productos con bajo stock</h2>
+              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">{totalBajoStock}</span>
+            </div>
+            <Link href="/inventario?bajoStock=1" className="text-xs font-medium text-orange-700 hover:text-orange-900 hover:underline">
+              Ver todos →
+            </Link>
           </div>
           <div className="space-y-2">
             {productosBajoStock.map((p) => (
-              <div key={p.id} className="flex items-center justify-between text-sm">
-                <span className="text-gray-700">{p.nombre}</span>
-                <span className="text-orange-600 font-medium">{p.stock} {p.unidad} (mín. {p.stock_minimo})</span>
+              <div key={p.id} className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-gray-700 truncate">{p.nombre}</span>
+                <span className={`font-medium whitespace-nowrap ${Number(p.stock) <= 0 ? 'text-red-600' : 'text-orange-600'}`}>
+                  {Number(p.stock) <= 0 ? 'Agotado' : `${p.stock} ${p.unidad}`} (mín. {p.stock_minimo})
+                </span>
               </div>
             ))}
           </div>
+          {totalBajoStock > productosBajoStock.length && (
+            <p className="text-xs text-gray-400 mt-3">y {totalBajoStock - productosBajoStock.length} más…</p>
+          )}
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Plus, ExternalLink, Pencil, Trash2, Eye, X, ArrowUp, ArrowDown, Mail, Loader2 } from 'lucide-react'
 import type { Cotizacion, EstadoCotizacion } from '@/types'
 import CotizacionModal from './CotizacionModal'
+import { borrar } from '@/lib/api-cliente'
 import type { ClienteParaCot, ProductoParaCot } from './CotizacionModal'
 
 interface Props {
@@ -71,17 +72,28 @@ export default function CotizacionesClient({ cotizaciones: inicial, clientes, pr
 
   async function eliminar(id: number) {
     if (!confirm('¿Eliminar esta cotización?')) return
-    await fetch(`/api/cotizaciones/${id}`, { method: 'DELETE' })
+    if (!(await borrar(`/api/cotizaciones/${id}`, 'No se pudo eliminar la cotización'))) return
     setCotizaciones((prev) => prev.filter((c) => c.id !== id))
   }
 
   async function cambiarEstado(id: number, estado: EstadoCotizacion) {
+    const anterior = cotizaciones.find((c) => c.id === id)?.estado
     setCotizaciones((prev) => prev.map((c) => c.id === id ? { ...c, estado } : c))
-    await fetch(`/api/cotizaciones/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estado }),
-    })
+    try {
+      const res = await fetch(`/api/cotizaciones/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error ?? 'No se pudo cambiar el estado')
+      }
+    } catch (err) {
+      // Revertir: la pantalla no debe mostrar un estado que no se guardó
+      if (anterior) setCotizaciones((prev) => prev.map((c) => c.id === id ? { ...c, estado: anterior } : c))
+      alert(err instanceof Error ? err.message : 'No se pudo cambiar el estado')
+    }
   }
 
   function abrirPDF(id: number) {

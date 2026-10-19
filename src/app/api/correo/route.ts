@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { requireNivel } from '@/lib/auth'
+import { NIVEL } from '@/lib/nivel'
+import { leerJson } from '@/lib/campos'
+import { escaparHtml, escaparMultilinea } from '@/lib/html'
+import { urlFirma } from '@/lib/firma'
 import { enviarCorreo } from '@/lib/correo'
-import { generarPDFCotizacion, type ItemPDF } from '@/lib/pdf-cotizacion'
+import { generarPDFCotizacion } from '@/lib/pdf-cotizacion'
 import { generarPDFReporte } from '@/lib/pdf-reporte'
+import { datosPDFCotizacion, datosPDFReporte, precioUnitarioCliente } from '@/lib/pdf-datos'
 
 const CC_FIJO = 'direccion@didara-ti.com'
 const AÑO = new Date().getFullYear()
@@ -43,11 +48,15 @@ function emailLayout(titulo: string, subtitulo: string, contenido: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = createServiceClient()
+  const auth = await requireNivel(NIVEL.ESTANDAR)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
 
-  const { destinatarios, mensaje_adicional, cotizacion_id, reporte_id, adjuntar_pdf } = await req.json()
+  const { destinatarios, mensaje_adicional, cotizacion_id, reporte_id, adjuntar_pdf } = await leerJson(req)
 
-  const emails: string[] = Array.isArray(destinatarios) ? destinatarios.filter((e: string) => e?.includes('@')) : []
+  const emails: string[] = Array.isArray(destinatarios)
+    ? destinatarios.filter((e): e is string => typeof e === 'string' && e.includes('@'))
+    : []
   if (!emails.length) {
     return NextResponse.json({ error: 'Selecciona al menos un destinatario.' }, { status: 400 })
   }
@@ -56,8 +65,9 @@ export async function POST(req: NextRequest) {
   let html = ''
   let adjuntos: { filename: string; content: Buffer; contentType: string }[] = []
 
-  const msgExtraHtml = mensaje_adicional
-    ? `<hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0;"><p style="font-size:.88rem;color:#374151;">${mensaje_adicional}</p>`
+  // El mensaje es texto libre: se escapa para que no se pueda inyectar HTML en el correo
+  const msgExtraHtml = typeof mensaje_adicional === 'string' && mensaje_adicional.trim()
+    ? `<hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0;"><p style="font-size:.88rem;color:#374151;">${escaparMultilinea(mensaje_adicional)}</p>`
     : ''
 
   try {
@@ -72,15 +82,14 @@ export async function POST(req: NextRequest) {
 
       if (!cot) return NextResponse.json({ error: 'Cotización no encontrada' }, { status: 404 })
 
-      const cfgRow = cfg as Record<string, string> | null
       const clienteNombre = (cot.cliente as { nombre?: string } | null)?.nombre ?? ''
       const rawItems: Record<string, unknown>[] = Array.isArray(cot.cotizacion_items) ? cot.cotizacion_items : []
 
       const itemsHtml = rawItems.map((item) => `
         <tr>
-          <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">${item.descripcion ?? ''}</td>
-          <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;text-align:center;">${item.cantidad ?? 0}</td>
-          <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;text-align:right;">${fmt$(Number(item.precio_unitario ?? 0))}</td>
+          <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">${escaparMultilinea(item.descripcion)}</td>
+          <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;text-align:center;">${escaparHtml(item.cantidad ?? 0)}</td>
+          <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;text-align:right;">${fmt$(precioUnitarioCliente(item))}</td>
           <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600;">${fmt$(Number(item.subtotal ?? 0))}</td>
         </tr>`).join('')
 
@@ -91,7 +100,7 @@ export async function POST(req: NextRequest) {
       asunto = `Cotización ${cot.folio} — Didara TI`
 
       const contenido = `
-        <p style="margin:0 0 14px;color:#374151;">Estimado(a) <strong>${clienteNombre}</strong>,</p>
+        <p style="margin:0 0 14px;color:#374151;">Estimado(a) <strong>${escaparHtml(clienteNombre)}</strong>,</p>
         <p style="margin:0 0 20px;color:#374151;">Le compartimos la cotización solicitada con los siguientes conceptos:</p>
         <table style="width:100%;border-collapse:collapse;font-size:.88rem;">
           <thead>
@@ -105,55 +114,22 @@ export async function POST(req: NextRequest) {
           <tbody>${itemsHtml}</tbody>
           <tfoot>
             <tr style="background:#f8fafc;">
-              ${cot.aplica_iva ? `<td colspan="3" style="padding:7px 10px;text-align:right;color:#475569;">IVA (${cot.iva_porcentaje}%):</td><td style="padding:7px 10px;text-align:right;font-weight:600;">${fmt$(Number(cot.iva_monto ?? 0))}</td></tr><tr style="background:#f8fafc;">` : ''}
+              ${cot.aplica_iva ? `<td colspan="3" style="padding:7px 10px;text-align:right;color:#475569;">IVA (${escaparHtml(cot.iva_porcentaje)}%):</td><td style="padding:7px 10px;text-align:right;font-weight:600;">${fmt$(Number(cot.iva_monto ?? 0))}</td></tr><tr style="background:#f8fafc;">` : ''}
               <td colspan="3" style="padding:10px;text-align:right;font-weight:700;color:#1e293b;">Total:</td>
               <td style="padding:10px;text-align:right;font-weight:800;font-size:1.05rem;color:#16a34a;">${fmt$(Number(cot.total ?? 0))}</td>
             </tr>
           </tfoot>
         </table>
-        ${cot.notas ? `<p style="margin:16px 0 0;font-size:.85rem;color:#64748b;"><strong>Notas:</strong> ${cot.notas}</p>` : ''}
+        ${cot.notas ? `<p style="margin:16px 0 0;font-size:.85rem;color:#64748b;"><strong>Notas:</strong> ${escaparMultilinea(cot.notas)}</p>` : ''}
         ${notaPdf}
         ${msgExtraHtml}
       `
 
-      html = emailLayout(`Cotización ${cot.folio}`, `Didara TI &nbsp;·&nbsp; ${fmtDate(cot.fecha)}`, contenido)
+      html = emailLayout(`Cotización ${escaparHtml(cot.folio)}`, `Didara TI &nbsp;·&nbsp; ${fmtDate(cot.fecha)}`, contenido)
 
       if (adjuntar_pdf) {
-        const items: ItemPDF[] = rawItems.map((item) => {
-          const producto = item.producto as { imagen_url?: string | null } | null
-          const imagenUrl = String(item.imagen_url ?? '').trim() || String(producto?.imagen_url ?? '').trim() || null
-          return {
-            descripcion: String(item.descripcion ?? ''),
-            cantidad: Number(item.cantidad ?? 0),
-            precio_unitario: `$${Number(item.precio_unitario ?? 0).toFixed(2)}`,
-            descuento: Number(item.descuento ?? 0),
-            subtotal: `$${Number(item.subtotal ?? 0).toFixed(2)}`,
-            imagen_url: imagenUrl,
-          }
-        })
-
-        const pdfBuffer = await generarPDFCotizacion({
-          folio: cot.folio ?? '',
-          fecha: cot.fecha ?? '',
-          vigencia: cot.vigencia ?? undefined,
-          cliente_nombre: clienteNombre,
-          aplica_iva: Boolean(cot.aplica_iva),
-          iva_porcentaje: String(cot.iva_porcentaje ?? '0'),
-          subtotal: `$${Number(cot.subtotal ?? 0).toFixed(2)}`,
-          iva_monto: `$${Number(cot.iva_monto ?? 0).toFixed(2)}`,
-          total: `$${Number(cot.total ?? 0).toFixed(2)}`,
-          notas: cot.notas ?? undefined,
-          condiciones: cot.condiciones ?? undefined,
-          elaborado_por: cot.elaborado_por ?? undefined,
-          empresa: cfgRow ? {
-            nombre: cfgRow.empresa_nombre ?? 'DIDARA TI',
-            direccion: cfgRow.empresa_direccion ?? '',
-            telefono: cfgRow.empresa_telefono ?? '',
-            email: cfgRow.empresa_email ?? '',
-            web: cfgRow.empresa_web ?? '',
-          } : undefined,
-          items,
-        })
+        // Mismo PDF que la descarga (precio con descuento aplicado, datos de pago)
+        const pdfBuffer = await generarPDFCotizacion(datosPDFCotizacion(cot, cfg))
 
         adjuntos = [{ filename: `Cotizacion_${cot.folio}.pdf`, content: Buffer.from(pdfBuffer), contentType: 'application/pdf' }]
       }
@@ -169,7 +145,6 @@ export async function POST(req: NextRequest) {
 
       if (!reporte) return NextResponse.json({ error: 'Reporte no encontrado' }, { status: 404 })
 
-      const cfgRow = cfg as Record<string, string> | null
       const clienteNombre = (reporte.cliente as { nombre?: string } | null)?.nombre ?? ''
 
       const { data: tecnicoRow } = reporte.tecnico_id
@@ -183,57 +158,24 @@ export async function POST(req: NextRequest) {
 
       asunto = `Reporte de Servicio ${reporte.folio} — Didara TI`
 
+      const firmaUrl = reporte.firma_fecha ? undefined : urlFirma(req, reporte.id)
+      const botonFirma = firmaUrl
+        ? `<p style="margin:22px 0 6px;color:#374151;">Para confirmar que el servicio quedó a su entera satisfacción, le pedimos firmar de conformidad:</p>
+           <p style="margin:0 0 6px;"><a href="${escaparHtml(firmaUrl)}" style="display:inline-block;background:#137D79;color:#ffffff;text-decoration:none;font-weight:600;padding:10px 22px;border-radius:8px;">Firmar de conformidad</a></p>`
+        : ''
+
       const contenido = `
-        <p style="margin:0 0 14px;color:#374151;">Estimado(a) <strong>${clienteNombre}</strong>,</p>
-        <p style="margin:0 0 18px;color:#374151;">Le informamos que el reporte de servicio <strong>${reporte.folio}</strong> ha sido procesado.</p>
+        <p style="margin:0 0 14px;color:#374151;">Estimado(a) <strong>${escaparHtml(clienteNombre)}</strong>,</p>
+        <p style="margin:0 0 18px;color:#374151;">Le informamos que el reporte de servicio <strong>${escaparHtml(reporte.folio)}</strong> ha sido procesado.</p>
+        ${botonFirma}
         ${notaPdf}
         ${msgExtraHtml}
       `
 
-      html = emailLayout(`Reporte de Servicio ${reporte.folio}`, 'Didara TI', contenido)
+      html = emailLayout(`Reporte de Servicio ${escaparHtml(reporte.folio)}`, 'Didara TI', contenido)
 
       if (adjuntar_pdf) {
-        const rawItems: Record<string, unknown>[] = Array.isArray(reporte.items) ? reporte.items : []
-        const items = rawItems.map((item) => ({
-          descripcion: String(item.descripcion ?? ''),
-          cantidad: Number(item.cantidad ?? 0),
-          precio_unitario: `$${Number(item.precio_unitario ?? 0).toFixed(2)}`,
-          subtotal: `$${Number(item.subtotal ?? 0).toFixed(2)}`,
-        }))
-
-        const pdfBuffer = await generarPDFReporte({
-          folio: reporte.folio ?? '',
-          fecha_ingreso: fmtDate(reporte.fecha_ingreso),
-          fecha_entrega: fmtDate(reporte.fecha_entrega) || undefined,
-          cliente_nombre: clienteNombre,
-          direccion_servicio: reporte.direccion_servicio ?? undefined,
-          tecnico_nombre: tecnicoNombre,
-          equipo: reporte.equipo ?? '',
-          marca: reporte.marca ?? undefined,
-          modelo: reporte.modelo ?? undefined,
-          serie: reporte.serie ?? undefined,
-          tipo_servicio: Array.isArray(reporte.tipo_servicio) ? reporte.tipo_servicio : [],
-          falla_reportada: reporte.falla_reportada ?? '',
-          diagnostico: reporte.diagnostico ?? undefined,
-          trabajos_realizados: Array.isArray(reporte.trabajos_realizados)
-            ? reporte.trabajos_realizados
-            : reporte.trabajo_realizado ? [reporte.trabajo_realizado] : [],
-          observaciones: reporte.observaciones ?? undefined,
-          evidencias: Array.isArray(reporte.evidencias) ? reporte.evidencias : [],
-          items,
-          subtotal: `$${Number(reporte.subtotal ?? 0).toFixed(2)}`,
-          total: `$${Number(reporte.total ?? 0).toFixed(2)}`,
-          firma_cliente: reporte.firma_cliente ?? undefined,
-          firma_fecha: reporte.firma_fecha ?? undefined,
-          estado: reporte.estado ?? '',
-          empresa: cfgRow ? {
-            nombre: cfgRow.empresa_nombre ?? 'DIDARA TI',
-            direccion: cfgRow.empresa_direccion ?? '',
-            telefono: cfgRow.empresa_telefono ?? '',
-            email: cfgRow.empresa_email ?? '',
-            web: cfgRow.empresa_web ?? '',
-          } : undefined,
-        })
+        const pdfBuffer = await generarPDFReporte(datosPDFReporte(reporte, tecnicoNombre, cfg, firmaUrl))
 
         adjuntos = [{ filename: `Reporte_${reporte.folio}.pdf`, content: Buffer.from(pdfBuffer), contentType: 'application/pdf' }]
       }

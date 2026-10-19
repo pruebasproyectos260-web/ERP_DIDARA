@@ -7,6 +7,7 @@ import { Suspense } from 'react'
 function FirmaForm() {
   const searchParams = useSearchParams()
   const reporteId = searchParams.get('id')
+  const token = searchParams.get('t')
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [dibujando, setDibujando] = useState(false)
@@ -14,22 +15,36 @@ function FirmaForm() {
   const [enviando, setEnviando] = useState(false)
   const [exito, setExito] = useState(false)
   const [error, setError] = useState('')
-  const [reporte, setReporte] = useState<{ folio: string; cliente: { nombre: string }; equipo: string } | null>(null)
+  const [reporte, setReporte] = useState<{ folio: string; cliente: string; equipo: string; firmado: boolean } | null>(null)
+  const [enlaceInvalido, setEnlaceInvalido] = useState('')
 
   useEffect(() => {
-    if (!reporteId) return
-    fetch(`/api/reportes/${reporteId}`)
-      .then((r) => r.json())
-      .then((j) => setReporte(j.data))
-  }, [reporteId])
+    if (!reporteId || !token) return
+    fetch(`/api/firma/${reporteId}?t=${encodeURIComponent(token)}`)
+      .then(async (r) => {
+        const j = await r.json()
+        if (!r.ok) return setEnlaceInvalido(j.error ?? 'Enlace de firma no válido.')
+        setReporte(j.data)
+      })
+      .catch(() => setEnlaceInvalido('No se pudo cargar el reporte. Revisa tu conexión.'))
+  }, [reporteId, token])
+
+  // El canvas mide 380×180 internamente pero se muestra al ancho de la pantalla:
+  // hay que escalar las coordenadas del dedo/mouse para que el trazo caiga donde se toca.
+  function posicion(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
+    const rect = canvas.getBoundingClientRect()
+    const punto = 'touches' in e ? e.touches[0] : e
+    return {
+      x: (punto.clientX - rect.left) * (canvas.width / rect.width),
+      y: (punto.clientY - rect.top) * (canvas.height / rect.height),
+    }
+  }
 
   function iniciar(e: React.MouseEvent | React.TouchEvent) {
     setDibujando(true)
     const canvas = canvasRef.current!
     const ctx = canvas.getContext('2d')!
-    const rect = canvas.getBoundingClientRect()
-    const x = 'touches' in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left
-    const y = 'touches' in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top
+    const { x, y } = posicion(e, canvas)
     ctx.beginPath()
     ctx.moveTo(x, y)
   }
@@ -39,9 +54,7 @@ function FirmaForm() {
     e.preventDefault()
     const canvas = canvasRef.current!
     const ctx = canvas.getContext('2d')!
-    const rect = canvas.getBoundingClientRect()
-    const x = 'touches' in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left
-    const y = 'touches' in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top
+    const { x, y } = posicion(e, canvas)
     ctx.lineWidth = 2
     ctx.lineCap = 'round'
     ctx.strokeStyle = '#1e293b'
@@ -67,28 +80,44 @@ function FirmaForm() {
     const canvas = canvasRef.current!
     const firmaBase64 = canvas.toDataURL('image/png')
 
-    const res = await fetch(`/api/reportes/${reporteId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        firma_cliente: firmaBase64,
-        firma_fecha: new Date().toISOString(),
-        estado: 'entregado',
-      }),
-    })
-
-    setEnviando(false)
-    if (!res.ok) {
-      const json = await res.json()
-      return setError(json.error ?? 'Error al guardar la firma')
+    try {
+      const res = await fetch(`/api/firma/${reporteId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ t: token, firma: firmaBase64 }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        return setError(json.error ?? 'Error al guardar la firma')
+      }
+      setExito(true)
+    } catch {
+      setError('Error de red. Revisa tu conexión e intenta de nuevo.')
+    } finally {
+      setEnviando(false)
     }
-    setExito(true)
   }
 
-  if (!reporteId) {
+  if (!reporteId || !token || enlaceInvalido) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Enlace de firma no válido.</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <p className="text-gray-500 text-center">{enlaceInvalido || 'Enlace de firma no válido.'}</p>
+      </div>
+    )
+  }
+
+  if (reporte?.firmado) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-sm w-full text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-3xl">✓</span>
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Reporte ya firmado</h2>
+          <p className="text-gray-600 text-sm">
+            La conformidad del reporte {reporte.folio} ya fue registrada. ¡Gracias!
+          </p>
+        </div>
       </div>
     )
   }
@@ -127,7 +156,7 @@ function FirmaForm() {
               <span className="font-medium">Reporte:</span> {reporte.folio}
             </p>
             <p className="text-sm text-gray-700">
-              <span className="font-medium">Cliente:</span> {reporte.cliente?.nombre}
+              <span className="font-medium">Cliente:</span> {reporte.cliente}
             </p>
             <p className="text-sm text-gray-700">
               <span className="font-medium">Equipo:</span> {reporte.equipo}

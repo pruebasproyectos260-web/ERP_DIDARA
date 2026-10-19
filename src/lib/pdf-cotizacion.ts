@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer-core'
+import { escaparHtml as e, escaparMultilinea } from './html'
 
 export interface ItemPDF {
   descripcion: string
@@ -64,13 +65,13 @@ function htmlCotizacion(d: DatosCotizacionPDF): string {
     <tr>
       <td class="img-cell">
         ${item.imagen_url
-          ? `<img src="${item.imagen_url}" class="product-img" />`
+          ? `<img src="${e(item.imagen_url)}" class="product-img" />`
           : `<div class="no-img">Sin img.</div>`}
       </td>
-      <td class="center">${item.cantidad}</td>
-      <td>${item.descripcion}</td>
-      <td class="right">${item.precio_unitario}</td>
-      <td class="right">${item.subtotal}</td>
+      <td class="center">${e(item.cantidad)}</td>
+      <td>${escaparMultilinea(item.descripcion)}</td>
+      <td class="right">${e(item.precio_unitario)}</td>
+      <td class="right">${e(item.subtotal)}</td>
     </tr>`).join('')
 
   return `<!DOCTYPE html>
@@ -153,24 +154,24 @@ ${logoSrc ? `<div class="watermark"></div>` : ''}
 <!-- Encabezado empresa -->
 <div class="header">
   <div class="company-center">
-    <div class="company-name">${emp.nombre}</div>
+    <div class="company-name">${e(emp.nombre)}</div>
     <div class="company-info">
-      ${emp.direccion}<br>
-      Tel: ${emp.telefono} | Email: ${emp.email} | Web: ${emp.web}
+      ${e(emp.direccion)}<br>
+      Tel: ${e(emp.telefono)} | Email: ${e(emp.email)} | Web: ${e(emp.web)}
     </div>
   </div>
-  ${logoSrc ? `<img src="${logoSrc}" class="logo-img" alt="${emp.nombre}" />` : `<div style="font-weight:bold;color:#1a7a6e">${emp.nombre}</div>`}
+  ${logoSrc ? `<img src="${e(logoSrc)}" class="logo-img" alt="${e(emp.nombre)}" />` : `<div style="font-weight:bold;color:#1a7a6e">${e(emp.nombre)}</div>`}
 </div>
 
 <div class="body">
 
   <!-- Folio -->
-  <div class="folio">${d.folio}</div>
+  <div class="folio">${e(d.folio)}</div>
 
   <!-- Datos generales -->
   <div class="meta">
-    <div><span class="label">Fecha:</span> ${d.fecha}${d.vigencia ? `&nbsp;&nbsp;&nbsp;<span class="label">Vigencia:</span> ${d.vigencia}` : ''}</div>
-    <div><span class="label">Cliente:</span> <span class="cliente-nombre">${d.cliente_nombre}</span></div>
+    <div><span class="label">Fecha:</span> ${e(d.fecha)}${d.vigencia ? `&nbsp;&nbsp;&nbsp;<span class="label">Vigencia:</span> ${e(d.vigencia)}` : ''}</div>
+    <div><span class="label">Cliente:</span> <span class="cliente-nombre">${e(d.cliente_nombre)}</span></div>
   </div>
 
   <!-- Tabla de productos/servicios -->
@@ -195,15 +196,15 @@ ${logoSrc ? `<div class="watermark"></div>` : ''}
     <table class="totals">
       <tr>
         <td>Subtotal:</td>
-        <td class="right">${d.subtotal}</td>
+        <td class="right">${e(d.subtotal)}</td>
       </tr>
       <tr>
-        <td>IVA (${d.iva_porcentaje}%):</td>
-        <td class="right">${d.iva_monto}</td>
+        <td>IVA (${e(d.iva_porcentaje)}%):</td>
+        <td class="right">${e(d.iva_monto)}</td>
       </tr>
       <tr class="total-row">
         <td>TOTAL:</td>
-        <td class="right">${d.total}</td>
+        <td class="right">${e(d.total)}</td>
       </tr>
     </table>
   </div>
@@ -212,7 +213,7 @@ ${logoSrc ? `<div class="watermark"></div>` : ''}
   ${d.notas || d.condiciones ? `
   <div class="notes">
     <div class="title">Notas y Condiciones Comerciales:</div>
-    <div class="body-text">${[d.notas, d.condiciones].filter(Boolean).join('<br>')}</div>
+    <div class="body-text">${[d.notas, d.condiciones].filter(Boolean).map(escaparMultilinea).join('<br>')}</div>
   </div>` : ''}
 
   <div class="gracias">Gracias por su preferencia.</div>
@@ -221,16 +222,16 @@ ${logoSrc ? `<div class="watermark"></div>` : ''}
   ${d.pago ? `
   <div class="pago">
     <div class="title">Método de pago:</div>
-    Nombre del banco: ${d.pago.banco}<br>
-    Número de cuenta: ${d.pago.cuenta}<br>
-    CLABE interbancaria: ${d.pago.clabe}<br>
-    Nombre del titular de la cuenta: ${d.pago.titular}
+    Nombre del banco: ${e(d.pago.banco)}<br>
+    Número de cuenta: ${e(d.pago.cuenta)}<br>
+    CLABE interbancaria: ${e(d.pago.clabe)}<br>
+    Nombre del titular de la cuenta: ${e(d.pago.titular)}
   </div>` : ''}
 
   <!-- Firma -->
   <div class="firma">
     <div class="firma-line">Firma y nombre de quien autoriza</div>
-    ${d.elaborado_por ? `<div class="elaborado">Elaborado por: ${d.elaborado_por}</div>` : ''}
+    ${d.elaborado_por ? `<div class="elaborado">Elaborado por: ${e(d.elaborado_por)}</div>` : ''}
   </div>
 
 </div>
@@ -280,7 +281,7 @@ export async function generarPDFCotizacion(datos: DatosCotizacionPDF): Promise<B
       <div style="width:100%;font-family:Arial,sans-serif;font-size:8px;color:#999;
         display:flex;justify-content:space-between;align-items:center;
         padding:4px 22px;border-top:1px solid #e5e7eb;box-sizing:border-box;">
-        <span style="color:#1a7a6e;font-weight:bold;letter-spacing:0.5px;">${datos.folio}</span>
+        <span style="color:#1a7a6e;font-weight:bold;letter-spacing:0.5px;">${e(datos.folio)}</span>
         <span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
       </div>`
     const pdf = await page.pdf({

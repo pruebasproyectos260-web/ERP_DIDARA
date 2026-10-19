@@ -19,20 +19,25 @@ export default async function DashboardPage() {
   const [
     { count: totalClientes },
     { count: reportesAbiertos },
-    { data: productosBajoStock },
+    { data: productos },
   ] = await Promise.all([
     supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('activo', true),
     supabase.from('reportes').select('*', { count: 'exact', head: true }).in('estado', ['abierto', 'en_proceso']),
-    supabase.from('productos').select('id, nombre, stock, stock_minimo, unidad')
-      .eq('activo', true).filter('stock', 'lte', 'stock_minimo').limit(5),
+    // PostgREST no compara dos columnas entre sí (stock <= stock_minimo), se filtra aquí
+    supabase.from('productos').select('id, nombre, stock, stock_minimo, unidad').eq('activo', true).gt('stock_minimo', 0),
   ])
+
+  const bajoStock = (productos ?? [])
+    .filter((p) => Number(p.stock) <= Number(p.stock_minimo))
+    .sort((a, b) => (Number(a.stock) - Number(a.stock_minimo)) - (Number(b.stock) - Number(b.stock_minimo)))
 
   return (
     <DashboardClient
       nivel={perfil?.nivel ?? 2}
       totalClientes={totalClientes ?? 0}
       reportesAbiertos={reportesAbiertos ?? 0}
-      productosBajoStock={productosBajoStock ?? []}
+      productosBajoStock={bajoStock.slice(0, 8)}
+      totalBajoStock={bajoStock.length}
       nombre={perfil?.nombre ?? ''}
     />
   )

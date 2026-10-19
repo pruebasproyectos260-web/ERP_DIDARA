@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { requireNivel } from '@/lib/auth'
+import { NIVEL } from '@/lib/nivel'
 
 export async function GET() {
-  const authClient = await createClient()
-  const { data: { user } } = await authClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  const supabase = createServiceClient()
+  const auth = await requireNivel(NIVEL.ESTANDAR)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
 
   const { data } = await supabase
     .from('usuarios')

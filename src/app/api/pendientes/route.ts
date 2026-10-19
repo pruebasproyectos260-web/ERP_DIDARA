@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { requireNivel } from '@/lib/auth'
+import { CAMPOS, leerJson, pick } from '@/lib/campos'
 
 export async function GET() {
-  const supabase = createServiceClient()
+  const auth = await requireNivel()
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
 
   // Auto-eliminar completados con más de 2 días
   const hace2Dias = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
@@ -22,8 +25,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = createServiceClient()
-  const body = await req.json()
+  const auth = await requireNivel()
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
+  const body = pick(await leerJson(req), CAMPOS.pendientes)
 
   const { data, error } = await supabase
     .from('pendientes')

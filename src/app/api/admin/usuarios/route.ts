@@ -1,29 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { z } from 'zod'
+import { requireNivel } from '@/lib/auth'
+import { NIVEL } from '@/lib/nivel'
+import { errorValidacion, leerJson } from '@/lib/campos'
+import { registrarActividad } from '@/lib/actividad'
 
 export async function GET() {
-  const supabase = await createServiceClient()
+  const auth = await requireNivel()
+  if (auth instanceof NextResponse) return auth
+  const { supabase, nivel } = auth
+
+  // Agenda y Pendientes usan esta lista para elegir responsables:
+  // quien no es admin solo recibe id y nombre.
+  const columnas = nivel <= NIVEL.ADMIN ? '*' : 'id, nombre'
 
   const { data, error } = await supabase
     .from('usuarios')
-    .select('*')
+    .select(columnas)
     .order('created_at')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })
 }
 
-export async function POST(req: NextRequest) {
-  const supabase = await createServiceClient()
-  const { username, password, nombre, correo, nivel, es_contador } = await req.json()
+const esquemaNuevo = z.object({
+  username: z.string().trim().toLowerCase()
+    .transform((u) => u.replace(/\s+/g, '_'))
+    .pipe(z.string()
+      .min(2, 'El usuario debe tener al menos 2 caracteres')
+      .max(40, 'El usuario no puede tener más de 40 caracteres')
+      .regex(/^[a-z0-9._-]+$/, 'El usuario solo puede tener letras sin acento, números, punto, guion y guion bajo')),
+  password: z.string()
+    .min(8, 'La contraseña debe tener al menos 8 caracteres')
+    .max(72, 'La contraseña no puede tener más de 72 caracteres'),
+  nombre: z.string().trim().min(1, 'El nombre es requerido').max(120),
+  correo: z.union([z.literal(''), z.email('El correo no es válido')]).nullish(),
+  nivel: z.number().int().min(0).max(3).default(NIVEL.ESTANDAR),
+  es_contador: z.boolean().default(false),
+})
 
-  if (!username || !password || !nombre) {
-    return NextResponse.json({ error: 'usuario, contraseña y nombre son requeridos' }, { status: 400 })
+export async function POST(req: NextRequest) {
+  const auth = await requireNivel(NIVEL.ADMIN)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
+
+  const parsed = esquemaNuevo.safeParse(await leerJson(req))
+  if (!parsed.success) return errorValidacion(parsed.error)
+  const { username, password, nombre, correo, nivel, es_contador } = parsed.data
+
+  if (nivel === NIVEL.SUPER_ADMIN && auth.nivel !== NIVEL.SUPER_ADMIN) {
+    return NextResponse.json({ error: 'Solo el super admin puede crear usuarios nivel 0' }, { status: 403 })
   }
 
   // Construir email interno a partir del username
-  const usernameClean = username.trim().toLowerCase().replace(/\s+/g, '_')
-  const email = `${usernameClean}@didara-erp.local`
+  const email = `${username}@didara-erp.local`
 
   // Crear usuario en Supabase Auth
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -38,11 +68,12 @@ export async function POST(req: NextRequest) {
   // Actualizar perfil con nivel, nombre y username (el trigger ya creó la fila)
   const { data, error } = await supabase
     .from('usuarios')
-    .update({ nombre, nivel: nivel ?? 2, es_contador: es_contador ?? false, username: usernameClean, correo: correo || null })
+    .update({ nombre, nivel, es_contador, username, correo: correo || null })
     .eq('id', authData.user.id)
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await registrarActividad(auth, 'crear', 'usuarios', data.id, `${nombre} (@${username}, nivel ${nivel})`)
   return NextResponse.json({ data }, { status: 201 })
 }

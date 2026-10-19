@@ -9,7 +9,7 @@ const ALLOWED_ORIGINS = [
   ...(process.env.NEXT_PUBLIC_APP_URL ? [process.env.NEXT_PUBLIC_APP_URL] : []),
 ]
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // ── CORS para rutas API ────────────────────────────────
@@ -59,7 +59,8 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const publicPaths = ['/login', '/firma-cliente']
+  // /api/firma/ valida su propio token de enlace (ver src/lib/firma.ts)
+  const publicPaths = ['/login', '/firma-cliente', '/api/firma/']
   const isPublic = publicPaths.some((p) => pathname.startsWith(p))
 
   if (!user && !isPublic) {

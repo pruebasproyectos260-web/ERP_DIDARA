@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Pencil, Plus, Settings, Trash2, Users } from 'lucide-react'
+import { History, Pencil, Plus, Settings, Trash2, Users } from 'lucide-react'
 import type { Usuario, Configuracion } from '@/types'
+import ActividadPanel from './ActividadPanel'
 
 interface Props {
   usuarios: Usuario[]
@@ -10,7 +11,7 @@ interface Props {
 }
 
 const nivelLabel: Record<number, string> = {
-  0: 'Admin',
+  0: 'Super admin',
   1: 'Admin',
   2: 'Estándar',
   3: 'Restringido',
@@ -21,7 +22,7 @@ const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm foc
 export default function AdminClient({ usuarios: inicial, config: configInicial }: Props) {
   const [usuarios, setUsuarios] = useState<Usuario[]>(inicial)
   const [config, setConfig] = useState(configInicial)
-  const [tab, setTab] = useState<'usuarios' | 'config'>('usuarios')
+  const [tab, setTab] = useState<'usuarios' | 'config' | 'actividad'>('usuarios')
 
   // ── Config ──────────────────────────────────────────────────
   const [iva, setIva] = useState(config?.iva_porcentaje?.toString() ?? '16')
@@ -167,8 +168,8 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
       <h1 className="text-2xl font-bold text-gray-900">Panel de Administración</h1>
 
       {/* Tabs */}
-      <div className="flex gap-2">
-        {(['usuarios', 'config'] as const).map((t) => (
+      <div className="flex flex-wrap gap-2">
+        {(['usuarios', 'config', 'actividad'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -176,11 +177,13 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
               tab === t ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
             }`}
           >
-            {t === 'usuarios' ? <Users size={15} /> : <Settings size={15} />}
-            {t === 'usuarios' ? 'Usuarios' : 'Configuración'}
+            {t === 'usuarios' ? <Users size={15} /> : t === 'config' ? <Settings size={15} /> : <History size={15} />}
+            {t === 'usuarios' ? 'Usuarios' : t === 'config' ? 'Configuración' : 'Actividad y respaldo'}
           </button>
         ))}
       </div>
+
+      {tab === 'actividad' && <ActividadPanel />}
 
       {/* ── Usuarios ── */}
       {tab === 'usuarios' && (
@@ -455,6 +458,8 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
                   onChange={(e) => setEditUser((u) => ({ ...u, nivel: e.target.value }))}
                   className={inputCls}
                 >
+                  {/* Antes el select no tenía nivel 0 y mostraba "Admin" al editar al super admin */}
+                  {editUser.nivel === '0' && <option value="0">Super admin (nivel 0)</option>}
                   <option value="1">Admin (nivel 1)</option>
                   <option value="2">Estándar (nivel 2)</option>
                   <option value="3">Restringido (nivel 3)</option>

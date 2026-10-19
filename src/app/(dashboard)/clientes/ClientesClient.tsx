@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { Plus, Search, Pencil, Trash2, ChevronDown, ChevronRight, ArrowUpDown } from 'lucide-react'
 import type { Cliente } from '@/types'
+import { borrar } from '@/lib/api-cliente'
 import ClienteModal from './ClienteModal'
 
 type Orden = 'id_asc' | 'id_desc' | 'nombre_az' | 'poliza'
@@ -39,7 +40,7 @@ export default function ClientesClient({ clientes: inicial, nivel, esContador }:
 
   async function eliminar(id: number) {
     if (!confirm('¿Eliminar este cliente?')) return
-    await fetch(`/api/clientes/${id}`, { method: 'DELETE' })
+    if (!(await borrar(`/api/clientes/${id}`, 'No se pudo eliminar el cliente'))) return
     setClientes((prev) => prev.filter((c) => c.id !== id))
   }
 

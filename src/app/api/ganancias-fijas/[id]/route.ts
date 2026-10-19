@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { requireNivel } from '@/lib/auth'
+import { NIVEL } from '@/lib/nivel'
+import { CAMPOS, leerJson, pick } from '@/lib/campos'
+import { registrarActividad } from '@/lib/actividad'
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireNivel(NIVEL.ESTANDAR)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { id } = await params
-  const supabase = createServiceClient()
-  const body = await req.json()
+  const body = pick(await leerJson(req), CAMPOS.ganancias_fijas)
 
   const { data, error } = await supabase
     .from('ganancias_fijas')
@@ -16,6 +21,7 @@ export async function PATCH(
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await registrarActividad(auth, 'editar', 'ganancias_fijas', id, `${data.descripcion}: $${data.monto}/mes`)
 
   // Si cambia monto o fecha_inicio, rebackfill
   if (body.fecha_inicio || body.monto !== undefined) {
@@ -41,9 +47,13 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireNivel(NIVEL.ADMIN)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { id } = await params
-  const supabase = createServiceClient()
-  const { error } = await supabase.from('ganancias_fijas').delete().eq('id', id)
+
+  const { data: borrados, error } = await supabase.from('ganancias_fijas').delete().eq('id', id).select('descripcion, monto')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (borrados?.length) await registrarActividad(auth, 'eliminar', 'ganancias_fijas', id, `${borrados[0].descripcion}: $${borrados[0].monto}/mes`)
   return NextResponse.json({ ok: true })
 }

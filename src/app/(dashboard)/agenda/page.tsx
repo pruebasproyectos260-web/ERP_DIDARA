@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, ChevronLeft, ChevronRight, Pencil, Trash2, Trash, Bell } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { borrar } from '@/lib/api-cliente'
 import type { Evento, Cliente, Usuario } from '@/types'
 
 const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -247,7 +248,7 @@ export default function AgendaPage() {
 
   async function eliminar(id: number) {
     if (!confirm('¿Eliminar este evento?')) return
-    await fetch(`/api/agenda/${id}`, { method: 'DELETE' })
+    if (!(await borrar(`/api/agenda/${id}`, 'No se pudo eliminar el evento'))) return
     setEventos(prev => prev.filter(ev => ev.id !== id))
   }
 

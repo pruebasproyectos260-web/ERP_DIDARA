@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { Plus, Pencil, Trash2, X, ExternalLink, Monitor, Search } from 'lucide-react'
+import { borrar } from '@/lib/api-cliente'
 
 interface Software {
   id: number
@@ -122,7 +123,7 @@ export default function SoftwareClient({ softwareInit, nivel }: Props) {
 
   async function eliminar(id: number, nombre: string) {
     if (!confirm(`¿Eliminar "${nombre}"?`)) return
-    await fetch(`/api/software/${id}`, { method: 'DELETE' })
+    if (!(await borrar(`/api/software/${id}`, 'No se pudo eliminar el software'))) return
     setLista((p) => p.filter((s) => s.id !== id))
     if (busqueda) setBusqueda('')
   }

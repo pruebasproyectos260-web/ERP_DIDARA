@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { requireNivel } from '@/lib/auth'
+import { NIVEL } from '@/lib/nivel'
+import { CAMPOS, leerJson, pick } from '@/lib/campos'
+import { registrarActividad } from '@/lib/actividad'
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireNivel(NIVEL.ESTANDAR)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { id } = await params
-  const supabase = createServiceClient()
-  const body = await req.json()
+  const body = pick(await leerJson(req), CAMPOS.software)
+
   const { data, error } = await supabase
     .from('software')
     .update(body)
@@ -22,9 +28,13 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireNivel(NIVEL.ESTANDAR)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { id } = await params
-  const supabase = createServiceClient()
-  const { error } = await supabase.from('software').delete().eq('id', id)
+
+  const { data: borrados, error } = await supabase.from('software').delete().eq('id', id).select('nombre')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (borrados?.length) await registrarActividad(auth, 'eliminar', 'software', id, borrados[0].nombre)
   return NextResponse.json({ ok: true })
 }

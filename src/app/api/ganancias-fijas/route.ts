@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { requireNivel } from '@/lib/auth'
+import { NIVEL } from '@/lib/nivel'
+import { CAMPOS, leerJson, pick } from '@/lib/campos'
+import { registrarActividad } from '@/lib/actividad'
 
 export async function GET() {
-  const supabase = createServiceClient()
+  const auth = await requireNivel(NIVEL.ESTANDAR)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
+
   const { data, error } = await supabase
     .from('ganancias_fijas')
     .select('*')
@@ -12,9 +18,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = createServiceClient()
-  const body = await req.json()
-  const { fecha_inicio, ...rest } = body
+  const auth = await requireNivel(NIVEL.ESTANDAR)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
+  const { fecha_inicio, ...rest } = pick(await leerJson(req), CAMPOS.ganancias_fijas)
 
   const { data, error } = await supabase
     .from('ganancias_fijas')
@@ -22,9 +29,10 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await registrarActividad(auth, 'crear', 'ganancias_fijas', data.id, `${data.descripcion}: $${data.monto}/mes`)
 
   // Backfill registros mensuales desde fecha_inicio hasta mes actual
-  if (fecha_inicio) {
+  if (typeof fecha_inicio === 'string' && fecha_inicio) {
     await backfillRegistros(supabase, 'ganancias_fijas_registros', 'ganancia_fija_id', data.id, fecha_inicio, data.monto)
   }
 

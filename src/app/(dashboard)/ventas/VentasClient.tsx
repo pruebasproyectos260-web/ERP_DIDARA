@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, X } from 'lucide-react'
 import type { GananciaFija, IngresoManual } from '@/types'
+import { borrar } from '@/lib/api-cliente'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
@@ -142,7 +143,7 @@ export default function VentasClient({ cotizaciones, reportes, ingresosManuales,
 
   async function eliminarManual(id: number) {
     if (!confirm('¿Eliminar este ingreso?')) return
-    await fetch(`/api/ingresos-manuales/${id}`, { method: 'DELETE' })
+    if (!(await borrar(`/api/ingresos-manuales/${id}`, 'No se pudo eliminar el ingreso'))) return
     setManuales((p) => p.filter((m) => m.id !== id))
   }
 
@@ -174,11 +175,11 @@ export default function VentasClient({ cotizaciones, reportes, ingresosManuales,
 
   async function eliminarFija(id: number) {
     if (!confirm('¿Eliminar esta ganancia fija?')) return
-    await fetch(`/api/ganancias-fijas/${id}`, { method: 'DELETE' })
+    if (!(await borrar(`/api/ganancias-fijas/${id}`, 'No se pudo eliminar la ganancia fija'))) return
     setFijas((p) => p.filter((f) => f.id !== id))
   }
 
-  void nivel
+  const puedeEliminar = nivel <= 1
 
   const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
   const btnPrimary = 'px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors'
@@ -327,7 +328,7 @@ export default function VentasClient({ cotizaciones, reportes, ingresosManuales,
                             <td className="px-3 py-2 text-gray-700">{m.descripcion}</td>
                             <td className="px-3 py-2 text-right font-semibold text-orange-700">{fmt(m.monto)}</td>
                             <td className="px-3 py-2">
-                              <button onClick={() => eliminarManual(m.id)} className="p-1 text-gray-400 hover:text-red-500 rounded"><Trash2 size={13} /></button>
+                              {puedeEliminar && <button onClick={() => eliminarManual(m.id)} className="p-1 text-gray-400 hover:text-red-500 rounded"><Trash2 size={13} /></button>}
                             </td>
                           </tr>
                         ))}</tbody>
@@ -354,7 +355,7 @@ export default function VentasClient({ cotizaciones, reportes, ingresosManuales,
                             <td className="px-3 py-2 flex items-center gap-1">
                               <button onClick={() => { setEditFija(g); setFFija({ descripcion: g.descripcion, monto: String(g.monto), dia: String(g.dia ?? ''), fecha_inicio: g.fecha_inicio ?? '', notas: g.notas ?? '' }); setModalFija(true); setErr('') }}
                                 className="p-1 text-gray-400 hover:text-blue-600 rounded"><Pencil size={13} /></button>
-                              <button onClick={() => eliminarFija(g.id)} className="p-1 text-gray-400 hover:text-red-500 rounded"><Trash2 size={13} /></button>
+                              {puedeEliminar && <button onClick={() => eliminarFija(g.id)} className="p-1 text-gray-400 hover:text-red-500 rounded"><Trash2 size={13} /></button>}
                             </td>
                           </tr>
                         ))}</tbody>

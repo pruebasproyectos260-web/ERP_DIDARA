@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LogOut, ChevronDown, Moon, Sun } from 'lucide-react'
+import { LogOut, ChevronDown, Moon, Sun, KeyRound } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
+import CambiarContrasenaModal from './CambiarContrasenaModal'
 
 interface Props {
   user: SupabaseUser
@@ -23,6 +24,18 @@ export default function Header({ user, perfil, esContador }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
+  const [modalContrasena, setModalContrasena] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Cerrar el menú al dar clic fuera de él
+  useEffect(() => {
+    if (!open) return
+    function alClicFuera(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', alClicFuera)
+    return () => document.removeEventListener('mousedown', alClicFuera)
+  }, [open])
 
   useEffect(() => {
     const saved = localStorage.getItem('darkMode') === 'true'
@@ -59,7 +72,7 @@ export default function Header({ user, perfil, esContador }: Props) {
       </button>
 
       {/* User menu */}
-      <div className="relative">
+      <div className="relative" ref={menuRef}>
         <button
           onClick={() => setOpen(!open)}
           className="flex items-center gap-2 text-sm text-[var(--text)] hover:text-[var(--text)] transition-colors"
@@ -80,6 +93,13 @@ export default function Header({ user, perfil, esContador }: Props) {
               <p className="text-xs text-[var(--text-muted)] truncate">{user.email}</p>
             </div>
             <button
+              onClick={() => { setOpen(false); setModalContrasena(true) }}
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors"
+            >
+              <KeyRound size={14} />
+              Cambiar contraseña
+            </button>
+            <button
               onClick={cerrarSesion}
               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
             >
@@ -89,6 +109,8 @@ export default function Header({ user, perfil, esContador }: Props) {
           </div>
         )}
       </div>
+
+      {modalContrasena && <CambiarContrasenaModal onClose={() => setModalContrasena(false)} />}
     </header>
   )
 }

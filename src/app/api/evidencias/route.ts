@@ -1,22 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { requireNivel } from '@/lib/auth'
+import { NIVEL } from '@/lib/nivel'
+import { leerJson } from '@/lib/campos'
+import { MAX_BYTES_IMAGEN, esImagenPermitida, extensionDeMime, segmentoSeguro } from '@/lib/imagenes'
 
 export async function POST(req: NextRequest) {
-  const supabase = createServiceClient()
-  const { data, mimeType, nombre, sesion, tipo } = await req.json()
+  const auth = await requireNivel(NIVEL.ESTANDAR)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
+  const { data, mimeType, nombre, sesion, tipo } = await leerJson(req)
 
-  if (!data || !mimeType) {
+  if (typeof data !== 'string' || !data || !mimeType) {
     return NextResponse.json({ error: 'Se requiere data y mimeType' }, { status: 400 })
   }
-
-  const ext = mimeType.split('/')[1]?.replace('jpeg', 'jpg') ?? 'jpg'
-  const safeName = (nombre ?? 'foto').replace(/[^a-z0-9._-]/gi, '_')
-  const folder = sesion
-    ? `${sesion}/${tipo ?? 'otro'}`
-    : `sin_sesion/${tipo ?? 'otro'}`
-  const filePath = `${folder}/${Date.now()}_${safeName}.${ext}`
+  if (!esImagenPermitida(mimeType)) {
+    return NextResponse.json({ error: 'Solo se permiten imágenes (JPG, PNG, WEBP...)' }, { status: 400 })
+  }
 
   const buffer = Buffer.from(data, 'base64')
+  if (buffer.length > MAX_BYTES_IMAGEN) {
+    return NextResponse.json({ error: 'La imagen no puede pesar más de 15 MB' }, { status: 400 })
+  }
+
+  const safeName = segmentoSeguro(typeof nombre === 'string' ? nombre.replace(/\.[^.]+$/, '') : '', 'foto')
+  const folder = `${segmentoSeguro(sesion, 'sin_sesion')}/${segmentoSeguro(tipo, 'otro')}`
+  const filePath = `${folder}/${Date.now()}_${safeName}.${extensionDeMime(mimeType)}`
 
   const { error } = await supabase.storage
     .from('evidencias')
@@ -32,10 +40,12 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const supabase = createServiceClient()
-  const { url } = await req.json()
+  const auth = await requireNivel(NIVEL.ESTANDAR)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
+  const { url } = await leerJson(req)
 
-  if (!url) return NextResponse.json({ error: 'Se requiere url' }, { status: 400 })
+  if (typeof url !== 'string' || !url) return NextResponse.json({ error: 'Se requiere url' }, { status: 400 })
 
   const marker = '/storage/v1/object/public/evidencias/'
   const idx = url.indexOf(marker)

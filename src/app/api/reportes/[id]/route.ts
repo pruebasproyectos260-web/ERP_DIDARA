@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { requireNivel } from '@/lib/auth'
+import { NIVEL } from '@/lib/nivel'
+import { CAMPOS, leerJson, pick, pickItems } from '@/lib/campos'
+import { reemplazarPartidas } from '@/lib/partidas'
+import { registrarActividad } from '@/lib/actividad'
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireNivel()
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { id } = await params
-  const supabase = createServiceClient()
 
   const { data, error } = await supabase
     .from('reportes')
@@ -22,10 +28,13 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireNivel(NIVEL.ESTANDAR)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { id } = await params
-  const supabase = createServiceClient()
-  const body = await req.json()
-  const { items, ...reporteData } = body
+  const body = await leerJson(req)
+  const reporteData = pick(body, CAMPOS.reportes)
+  const items = pickItems(body.items, CAMPOS.reporte_items)
 
   const { error } = await supabase
     .from('reportes')
@@ -35,12 +44,8 @@ export async function PATCH(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   if (items !== undefined) {
-    await supabase.from('reporte_items').delete().eq('reporte_id', id)
-    if (items.length > 0) {
-      await supabase.from('reporte_items').insert(
-        items.map((item: Record<string, unknown>) => ({ ...item, reporte_id: id }))
-      )
-    }
+    const errorPartidas = await reemplazarPartidas(supabase, 'reporte_items', 'reporte_id', id, items)
+    if (errorPartidas) return NextResponse.json({ error: errorPartidas }, { status: 500 })
   }
 
   const { data: completo } = await supabase
@@ -49,6 +54,8 @@ export async function PATCH(
     .eq('id', id)
     .single()
 
+  if (completo) await registrarActividad(auth, 'editar', 'reportes', id, `${completo.folio} (estado: ${completo.estado})`)
+
   return NextResponse.json({ data: completo })
 }
 
@@ -56,21 +63,23 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireNivel(NIVEL.ADMIN)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { id } = await params
-  const supabase = createServiceClient()
-  const serviceSupabase = createServiceClient()
 
   // Obtener evidencias antes de borrar para limpiar Storage
   const { data: reporte } = await supabase
     .from('reportes')
-    .select('evidencias')
+    .select('evidencias, folio')
     .eq('id', id)
     .single()
 
   const { error } = await supabase.from('reportes').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (reporte) await registrarActividad(auth, 'eliminar', 'reportes', id, reporte.folio)
 
-  // Borrar imágenes de Storage con service client (bypasea RLS)
+  // Borrar imágenes de Storage
   if (reporte?.evidencias) {
     const evidencias = reporte.evidencias as { urls?: string[] }[]
     const paths = evidencias
@@ -83,7 +92,7 @@ export async function DELETE(
       .filter(Boolean) as string[]
 
     if (paths.length > 0) {
-      await serviceSupabase.storage.from('evidencias').remove(paths)
+      await supabase.storage.from('evidencias').remove(paths)
     }
   }
 

@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, ExternalLink, Eye, Mail, Loader2, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, ExternalLink, Eye, Mail, Loader2, X, PenLine, BadgeCheck, Copy, Check, MessageCircle } from 'lucide-react'
 import type { Reporte } from '@/types'
 import ReporteModal from './ReporteModal'
+import { borrar } from '@/lib/api-cliente'
 
 export interface ClienteParaReporte {
   id: number
@@ -71,6 +72,8 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
   const [busqueda, setBusqueda] = useState('')
   const [verDetalle, setVerDetalle] = useState<Reporte | null>(null)
   const [mailState, setMailState] = useState<MailRepState | null>(null)
+  const [firmaLink, setFirmaLink] = useState<{ rep: Reporte; url: string; copiado: boolean } | null>(null)
+  const [generandoFirma, setGenerandoFirma] = useState<number | null>(null)
 
   const filtrados = reportes.filter((r) => {
     const matchEstado = !filtroEstado || r.estado === filtroEstado
@@ -82,9 +85,34 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
 
   async function eliminar(id: number) {
     if (!confirm('¿Eliminar este reporte?')) return
-    await fetch(`/api/reportes/${id}`, { method: 'DELETE' })
+    if (!(await borrar(`/api/reportes/${id}`, 'No se pudo eliminar el reporte'))) return
     setReportes((prev) => prev.filter((r) => r.id !== id))
     if (verDetalle?.id === id) setVerDetalle(null)
+  }
+
+  async function abrirFirma(r: Reporte) {
+    setGenerandoFirma(r.id)
+    try {
+      const res = await fetch(`/api/reportes/${r.id}/firma-link`)
+      const json = await res.json()
+      if (!res.ok) return alert(json.error ?? 'No se pudo generar el enlace de firma')
+      const url = `${window.location.origin}/firma-cliente?id=${r.id}&t=${json.data.token}`
+      setFirmaLink({ rep: r, url, copiado: false })
+    } catch {
+      alert('Error de red. Intenta de nuevo.')
+    } finally {
+      setGenerandoFirma(null)
+    }
+  }
+
+  async function copiarFirma() {
+    if (!firmaLink) return
+    try {
+      await navigator.clipboard.writeText(firmaLink.url)
+      setFirmaLink({ ...firmaLink, copiado: true })
+    } catch {
+      prompt('Copia el enlace:', firmaLink.url)
+    }
   }
 
   function abrirPDF(id: number) {
@@ -284,6 +312,23 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
                           title="Enviar por correo"
                         >
                           <Mail size={13} />
+                        </button>
+                      )}
+                      {r.firma_fecha ? (
+                        <span
+                          className="p-1.5 text-purple-600"
+                          title={`Firmado por el cliente el ${new Date(r.firma_fecha).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}`}
+                        >
+                          <BadgeCheck size={13} />
+                        </span>
+                      ) : puedeEditar && (
+                        <button
+                          onClick={() => abrirFirma(r)}
+                          disabled={generandoFirma === r.id}
+                          className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors disabled:opacity-50"
+                          title="Enlace de firma para el cliente"
+                        >
+                          {generandoFirma === r.id ? <Loader2 size={13} className="animate-spin" /> : <PenLine size={13} />}
                         </button>
                       )}
                       {puedeEditar && (
@@ -513,6 +558,40 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal enlace de firma */}
+      {firmaLink && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setFirmaLink(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <PenLine size={16} className="text-purple-600" />
+                <h3 className="font-semibold text-gray-900">Firma del cliente — {firmaLink.rep.folio}</h3>
+              </div>
+              <button onClick={() => setFirmaLink(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-sm text-gray-600">
+                Envía este enlace al cliente. Al firmar, el reporte se marca como <strong>entregado</strong> y la firma aparece en el PDF.
+              </p>
+              <input readOnly value={firmaLink.url} onFocus={(e) => e.target.select()}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono text-gray-700 bg-gray-50" />
+              <div className="flex gap-2">
+                <button onClick={copiarFirma}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors">
+                  {firmaLink.copiado ? <><Check size={14} />Copiado</> : <><Copy size={14} />Copiar enlace</>}
+                </button>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(`Hola, por favor firma de conformidad el reporte ${firmaLink.rep.folio} de Didara TI: ${firmaLink.url}`)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors">
+                  <MessageCircle size={14} />WhatsApp
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}

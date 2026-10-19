@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { requireNivel } from '@/lib/auth'
+import { NIVEL } from '@/lib/nivel'
 
 export async function GET() {
-  const supabase = createServiceClient()
+  const auth = await requireNivel(NIVEL.ADMIN)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
+
   const { data: gastos } = await supabase.from('gastos_fijos').select('*').not('dia', 'is', null)
 
   if (!gastos?.length) return NextResponse.json({ data: [] })

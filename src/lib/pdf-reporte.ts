@@ -1,5 +1,6 @@
 import puppeteer from 'puppeteer-core'
 import type { PagoPDF } from './pdf-cotizacion'
+import { escaparHtml as e, escaparMultilinea } from './html'
 export type { PagoPDF }
 
 export interface ItemPDFReporte {
@@ -45,6 +46,8 @@ export interface DatosReportePDF {
   total: string
   firma_cliente?: string
   firma_fecha?: string
+  /** Enlace público para que el cliente firme (solo si aún no ha firmado) */
+  firma_url?: string
   empresa?: EmpresaPDFReporte
   pago?: PagoPDF
   estado: string
@@ -73,15 +76,15 @@ function htmlReporte(d: DatosReportePDF): string {
   void tipoServStr
 
   const trabajosHtml = d.trabajos_realizados.length > 0
-    ? d.trabajos_realizados.map((t) => `<li>${t}</li>`).join('')
+    ? d.trabajos_realizados.map((t) => `<li>${e(t)}</li>`).join('')
     : '<li style="color:#999">No se registraron trabajos.</li>'
 
   // Materiales: siempre visible, con mensaje cuando está vacío
   const filasItems = d.items.map((item) => `
     <tr>
-      <td class="center">${item.cantidad}</td>
-      <td>${item.descripcion}</td>
-      <td class="right">${item.subtotal}</td>
+      <td class="center">${e(item.cantidad)}</td>
+      <td>${escaparMultilinea(item.descripcion)}</td>
+      <td class="right">${e(item.subtotal)}</td>
     </tr>`).join('')
 
   const materialesHtml = d.items.length > 0
@@ -97,7 +100,7 @@ function htmlReporte(d: DatosReportePDF): string {
       </table>
       <div class="totals-wrap">
         <table class="totals">
-          <tr class="total-row"><td>TOTAL:</td><td class="right">${d.total}</td></tr>
+          <tr class="total-row"><td>TOTAL:</td><td class="right">${e(d.total)}</td></tr>
         </table>
       </div>`
     : '<p style="color:#aaa;font-size:10px;padding:6px 4px;font-style:italic">No se utilizaron materiales.</p>'
@@ -111,17 +114,17 @@ function htmlReporte(d: DatosReportePDF): string {
       const label = ev.tipo === 'antes' ? 'Antes' : ev.tipo === 'despues' ? 'Después' : ev.tipo
       const titulo = ev.descripcion ? `${label}: ${ev.descripcion}` : label
       const imgs = ev.urls
-        .map((url) => `<img src="${url}" class="ev-img" alt="${label}" onerror="this.style.display='none'" />`)
+        .map((url) => `<img src="${e(url)}" class="ev-img" alt="${e(label)}" onerror="this.style.display='none'" />`)
         .join('')
       return `<div class="ev-group">
-        <div class="ev-label">Evidencia - ${titulo}</div>
+        <div class="ev-label">Evidencia - ${e(titulo)}</div>
         <div class="ev-imgs">${imgs}</div>
       </div>`
     }).join('')
   })()
 
   const firmaHtml = d.firma_cliente
-    ? `<img src="${d.firma_cliente}" style="height:70px;max-width:200px;object-fit:contain;" />`
+    ? `<img src="${e(d.firma_cliente)}" style="height:70px;max-width:200px;object-fit:contain;" />`
     : `<div class="firma-linea"></div>`
 
   const firmaFechaStr = d.firma_fecha
@@ -228,30 +231,30 @@ function htmlReporte(d: DatosReportePDF): string {
 <!-- Header empresa -->
 <div class="header">
   <div class="company-center">
-    <div class="company-name">${emp.nombre}</div>
+    <div class="company-name">${e(emp.nombre)}</div>
     <div class="company-info">
-      ${emp.direccion}<br>
-      Tel: ${emp.telefono} | Email: ${emp.email} | Web: ${emp.web}
+      ${e(emp.direccion)}<br>
+      Tel: ${e(emp.telefono)} | Email: ${e(emp.email)} | Web: ${e(emp.web)}
     </div>
   </div>
-  ${LOGO_URL ? `<img src="${LOGO_URL}" class="logo-img" alt="${emp.nombre}" />` : ''}
+  ${LOGO_URL ? `<img src="${e(LOGO_URL)}" class="logo-img" alt="${e(emp.nombre)}" />` : ''}
 </div>
 
 <div class="body">
 
   <!-- Folio -->
   <div class="folio-row">
-    <span class="folio">${d.folio}</span>
+    <span class="folio">${e(d.folio)}</span>
   </div>
 
   <!-- Datos generales -->
   <div class="section">
     <div class="section-title">Datos Generales</div>
     <div class="info-grid">
-      <div class="info-row"><span class="info-label">Cliente:</span><span class="info-val">${d.cliente_nombre}</span></div>
-      <div class="info-row"><span class="info-label">Técnico:</span><span class="info-val">${d.tecnico_nombre}</span></div>
-      <div class="info-row"><span class="info-label">Fecha ingreso:</span><span class="info-val">${d.fecha_ingreso}</span></div>
-      ${d.direccion_servicio ? `<div class="info-row full"><span class="info-label">Dirección de servicio:</span><span class="info-val">&nbsp;${d.direccion_servicio}</span></div>` : ''}
+      <div class="info-row"><span class="info-label">Cliente:</span><span class="info-val">${e(d.cliente_nombre)}</span></div>
+      <div class="info-row"><span class="info-label">Técnico:</span><span class="info-val">${e(d.tecnico_nombre)}</span></div>
+      <div class="info-row"><span class="info-label">Fecha ingreso:</span><span class="info-val">${e(d.fecha_ingreso)}</span></div>
+      ${d.direccion_servicio ? `<div class="info-row full"><span class="info-label">Dirección de servicio:</span><span class="info-val">&nbsp;${e(d.direccion_servicio)}</span></div>` : ''}
     </div>
   </div>
 
@@ -260,21 +263,21 @@ function htmlReporte(d: DatosReportePDF): string {
   <div class="section">
     <div class="section-title">Tipo de Servicio</div>
     <div class="tipo-tags">
-      ${d.tipo_servicio.map((t) => `<span class="tipo-tag">${t}</span>`).join('')}
+      ${d.tipo_servicio.map((t) => `<span class="tipo-tag">${e(t)}</span>`).join('')}
     </div>
   </div>` : ''}
 
   <!-- Falla reportada -->
   <div class="section">
     <div class="section-title">Falla Reportada</div>
-    <div class="text-box">${d.falla_reportada}</div>
+    <div class="text-box">${e(d.falla_reportada)}</div>
   </div>
 
   ${d.diagnostico ? `
   <!-- Diagnóstico -->
   <div class="section">
     <div class="section-title">Diagnóstico</div>
-    <div class="text-box">${d.diagnostico}</div>
+    <div class="text-box">${e(d.diagnostico)}</div>
   </div>` : ''}
 
   <!-- Trabajos realizados -->
@@ -293,7 +296,7 @@ function htmlReporte(d: DatosReportePDF): string {
   <!-- Observaciones -->
   <div class="section">
     <div class="section-title">Observaciones</div>
-    <div class="text-box" style="font-style:italic;color:#555">${d.observaciones}</div>
+    <div class="text-box" style="font-style:italic;color:#555">${e(d.observaciones)}</div>
   </div>` : ''}
 
   ${evidenciasHtml ? `
@@ -308,17 +311,17 @@ function htmlReporte(d: DatosReportePDF): string {
     ${d.pago ? `
     <div class="payment-box">
       <div class="payment-title">Método de pago:</div>
-      Banco: ${d.pago.banco}<br>
-      Cuenta: ${d.pago.cuenta}<br>
-      CLABE: ${d.pago.clabe}<br>
-      Titular: ${d.pago.titular}
+      Banco: ${e(d.pago.banco)}<br>
+      Cuenta: ${e(d.pago.cuenta)}<br>
+      CLABE: ${e(d.pago.clabe)}<br>
+      Titular: ${e(d.pago.titular)}
     </div>` : '<div></div>'}
     <div class="firma-box">
       ${firmaHtml}
       <div class="firma-label">Nombre y firma de quien corresponda la autorización:</div>
       ${d.firma_cliente
         ? ''
-        : `<a href="#" style="font-size:9px;color:#1a7a6e">Haga clic aquí para firmar el reporte</a><br><span style="font-size:8px;color:#999">Firma pendiente</span>`
+        : `${d.firma_url ? `<a href="${e(d.firma_url)}" style="font-size:9px;color:#1a7a6e">Haga clic aquí para firmar el reporte</a><br>` : ''}<span style="font-size:8px;color:#999">Firma pendiente</span>`
       }
       ${firmaFechaStr ? `<div class="firma-fecha">${firmaFechaStr}</div>` : ''}
     </div>
@@ -369,7 +372,7 @@ export async function generarPDFReporte(datos: DatosReportePDF): Promise<Buffer>
       <div style="width:100%;font-family:Arial,sans-serif;font-size:8px;color:#999;
         display:flex;justify-content:space-between;align-items:center;
         padding:4px 22px;border-top:1px solid #e5e7eb;box-sizing:border-box;">
-        <span style="color:#1a7a6e;font-weight:bold;letter-spacing:0.5px;">${datos.folio}</span>
+        <span style="color:#1a7a6e;font-weight:bold;letter-spacing:0.5px;">${e(datos.folio)}</span>
         <span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
       </div>`
     const pdf = await page.pdf({

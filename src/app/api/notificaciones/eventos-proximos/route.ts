@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+import { requireNivel } from '@/lib/auth'
 
-export async function GET(req: NextRequest) {
-  const supabase = createServiceClient()
-  const { searchParams } = new URL(req.url)
-  const userId = searchParams.get('userId')
-  if (!userId) return NextResponse.json({ data: [] })
+export async function GET() {
+  const auth = await requireNivel()
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
 
+  // Siempre los eventos del usuario en sesión (se ignora ?userId= para no consultar agendas ajenas)
   const hoy = new Date()
   hoy.setHours(0, 0, 0, 0)
   const desde = hoy.toISOString().slice(0, 10)
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase
     .from('eventos')
     .select('id, titulo, tipo, fecha_inicio, estado')
-    .eq('responsable_id', userId)
+    .eq('responsable_id', auth.userId)
     .gte('fecha_inicio', desde)
     .lte('fecha_inicio', hastaStr)
     .not('estado', 'in', '("Completado","Cancelado")')

@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
-import { generarPDFCotizacion, type ItemPDF } from '@/lib/pdf-cotizacion'
+import { requireNivel } from '@/lib/auth'
+import { generarPDFCotizacion } from '@/lib/pdf-cotizacion'
+import { datosPDFCotizacion } from '@/lib/pdf-datos'
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireNivel()
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { id } = await params
-  const supabase = createServiceClient()
 
   const [{ data: cot, error }, { data: cfg }] = await Promise.all([
     supabase
@@ -22,69 +25,8 @@ export async function GET(
     return NextResponse.json({ error: 'Cotización no encontrada' }, { status: 404 })
   }
 
-  const cliente = cot.cliente as Record<string, string> | null
-
-  const rawItems: Record<string, unknown>[] = Array.isArray(cot.cotizacion_items)
-    ? cot.cotizacion_items
-    : []
-
-  const items: ItemPDF[] = rawItems.map((item) => {
-    const producto = item.producto as { imagen_url?: string | null } | null
-    const imagenUrl =
-      String(item.imagen_url ?? '').trim() ||
-      String(producto?.imagen_url ?? '').trim() ||
-      null
-
-    // El precio unitario que ve el cliente ya incluye el descuento/recargo del cliente.
-    // Así el cliente no ve ni el precio base ni el porcentaje de ajuste.
-    const precioBase = Number(item.precio_unitario ?? 0)
-    const desc = Number(item.descuento ?? 0)
-    const precioEfectivo = precioBase * (1 - desc / 100)
-
-    return {
-      descripcion: String(item.descripcion ?? ''),
-      cantidad: Number(item.cantidad ?? 0),
-      precio_unitario: `$${precioEfectivo.toFixed(2)}`,
-      descuento: 0,
-      subtotal: `$${Number(item.subtotal ?? 0).toFixed(2)}`,
-      imagen_url: imagenUrl,
-    }
-  })
-
-  const cfgRow = cfg as Record<string, string | boolean | null> | null
-
-  const pagoMostrar = cfgRow?.pago_mostrar !== false
-  const pagoCfg = cfgRow && pagoMostrar && cfgRow.pago_banco ? {
-    banco:   String(cfgRow.pago_banco   ?? ''),
-    cuenta:  String(cfgRow.pago_cuenta  ?? ''),
-    clabe:   String(cfgRow.pago_clabe   ?? ''),
-    titular: String(cfgRow.pago_titular ?? ''),
-  } : undefined
-
   try {
-    const pdfBuffer = await generarPDFCotizacion({
-      folio: cot.folio ?? '',
-      fecha: cot.fecha ?? '',
-      vigencia: cot.vigencia ?? undefined,
-      cliente_nombre: cliente?.nombre ?? '',
-      aplica_iva: Boolean(cot.aplica_iva),
-      iva_porcentaje: cot.iva_porcentaje?.toString() ?? '0',
-      subtotal: `$${Number(cot.subtotal ?? 0).toFixed(2)}`,
-      iva_monto: `$${Number(cot.iva_monto ?? 0).toFixed(2)}`,
-      total: `$${Number(cot.total ?? 0).toFixed(2)}`,
-      notas: cot.notas ?? undefined,
-      condiciones: cot.condiciones ?? undefined,
-      elaborado_por: cot.elaborado_por ?? undefined,
-      empresa: cfgRow ? {
-        nombre:    String(cfgRow.empresa_nombre    ?? 'DIDARA TI'),
-        direccion: String(cfgRow.empresa_direccion ?? ''),
-        telefono:  String(cfgRow.empresa_telefono  ?? ''),
-        email:     String(cfgRow.empresa_email     ?? ''),
-        web:       String(cfgRow.empresa_web       ?? ''),
-      } : undefined,
-      pago: pagoCfg,
-      items,
-    })
+    const pdfBuffer = await generarPDFCotizacion(datosPDFCotizacion(cot, cfg))
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {

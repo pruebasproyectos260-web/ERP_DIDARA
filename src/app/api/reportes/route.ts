@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { requireNivel } from '@/lib/auth'
+import { NIVEL } from '@/lib/nivel'
+import { CAMPOS, leerJson, pick, pickItems } from '@/lib/campos'
+import { registrarActividad } from '@/lib/actividad'
 
 export async function GET(req: NextRequest) {
-  const supabase = createServiceClient()
+  const auth = await requireNivel()
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { searchParams } = new URL(req.url)
   const estado = searchParams.get('estado') ?? ''
   const clienteId = searchParams.get('cliente_id') ?? ''
@@ -25,9 +30,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = createServiceClient()
-  const body = await req.json()
-  const { items, ...reporteData } = body
+  const auth = await requireNivel(NIVEL.ESTANDAR)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
+  const body = await leerJson(req)
+  const reporteData = pick(body, CAMPOS.reportes)
+  const items = pickItems(body.items, CAMPOS.reporte_items)
 
   const { data: folioData } = await supabase.rpc('generar_folio', {
     prefijo: 'RST',
@@ -42,11 +50,14 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  if (items?.length > 0) {
-    await supabase.from('reporte_items').insert(
-      items.map((item: Record<string, unknown>) => ({ ...item, reporte_id: reporte.id }))
+  if (items && items.length > 0) {
+    const { error: itemsError } = await supabase.from('reporte_items').insert(
+      items.map((item) => ({ ...item, reporte_id: reporte.id }))
     )
+    if (itemsError) return NextResponse.json({ error: `El reporte ${reporte.folio} se creó pero sus partidas no: ${itemsError.message}` }, { status: 500 })
   }
+
+  await registrarActividad(auth, 'crear', 'reportes', reporte.id, reporte.folio)
 
   const { data: completo } = await supabase
     .from('reportes')

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Plus, Pencil, Trash2, X, Check, AlertTriangle } from 'lucide-react'
 import type { Pendiente, Cliente, Usuario } from '@/types'
+import { borrar } from '@/lib/api-cliente'
 
 const ESTADOS: Pendiente['estado'][] = ['Pendiente', 'Completado']
 
@@ -181,7 +182,7 @@ export default function PendientesPage() {
 
   async function eliminar(id: number) {
     if (!confirm('¿Eliminar este pendiente?')) return
-    await fetch(`/api/pendientes/${id}`, { method: 'DELETE' })
+    if (!(await borrar(`/api/pendientes/${id}`, 'No se pudo eliminar el pendiente'))) return
     setPendientes(prev => prev.filter(p => p.id !== id))
   }
 

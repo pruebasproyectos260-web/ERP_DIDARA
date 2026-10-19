@@ -1,7 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
+import { NIVEL } from '@/lib/nivel'
+import { ocultarCostosProducto } from '@/lib/campos'
 import InventarioClient from './InventarioClient'
 
-export default async function InventarioPage() {
+export default async function InventarioPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ bajoStock?: string; sinStock?: string }>
+}) {
+  const { bajoStock, sinStock } = await searchParams
   const supabase = await createClient()
 
   const [{ data: productos }, { data: configData }, { data: { user } }] = await Promise.all([
@@ -16,11 +23,14 @@ export default async function InventarioPage() {
     .eq('id', user!.id)
     .single()
 
+  const nivel = perfil?.nivel ?? 2
+
   return (
     <InventarioClient
-      productos={productos ?? []}
+      productos={nivel >= NIVEL.RESTRINGIDO ? (productos ?? []).map(ocultarCostosProducto) : productos ?? []}
       ivaDefault={configData?.iva_porcentaje ?? 16}
-      nivel={perfil?.nivel ?? 2}
+      nivel={nivel}
+      filtroInicial={bajoStock ? 'bajo' : sinStock ? 'sinstock' : null}
     />
   )
 }

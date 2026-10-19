@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, X } from 'lucide-react'
 import type { GastoFijo, GastoVariable } from '@/types'
+import { borrar } from '@/lib/api-cliente'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
@@ -104,7 +105,7 @@ export default function GastosClient({ gastosFijosInit, gastosVariablesInit, niv
 
   async function eliminarFijo(id: number) {
     if (!confirm('¿Eliminar este gasto fijo?')) return
-    await fetch(`/api/gastos-fijos/${id}`, { method: 'DELETE' })
+    if (!(await borrar(`/api/gastos-fijos/${id}`, 'No se pudo eliminar el gasto fijo'))) return
     setFijos((p) => p.filter((g) => g.id !== id))
   }
 
@@ -134,7 +135,7 @@ export default function GastosClient({ gastosFijosInit, gastosVariablesInit, niv
 
   async function eliminarVar(id: number) {
     if (!confirm('¿Eliminar este gasto?')) return
-    await fetch(`/api/gastos-variables/${id}`, { method: 'DELETE' })
+    if (!(await borrar(`/api/gastos-variables/${id}`, 'No se pudo eliminar el gasto'))) return
     setVariables((p) => p.filter((g) => g.id !== id))
   }
 

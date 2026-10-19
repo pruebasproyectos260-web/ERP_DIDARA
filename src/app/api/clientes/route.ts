@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { requireNivel } from '@/lib/auth'
+import { NIVEL } from '@/lib/nivel'
+import { CAMPOS, leerJson, limpiarBusqueda, pick } from '@/lib/campos'
+import { registrarActividad } from '@/lib/actividad'
 
 export async function GET(req: NextRequest) {
-  const supabase = createServiceClient()
+  const auth = await requireNivel()
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
   const { searchParams } = new URL(req.url)
-  const q = searchParams.get('q') ?? ''
+  const q = limpiarBusqueda(searchParams.get('q') ?? '')
 
   let query = supabase
     .from('clientes')
@@ -23,8 +28,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = createServiceClient()
-  const body = await req.json()
+  const auth = await requireNivel(NIVEL.ESTANDAR)
+  if (auth instanceof NextResponse) return auth
+  const { supabase } = auth
+  const body = pick(await leerJson(req), CAMPOS.clientes)
 
   const { data, error } = await supabase
     .from('clientes')
@@ -33,5 +40,6 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await registrarActividad(auth, 'crear', 'clientes', data.id, data.nombre)
   return NextResponse.json({ data }, { status: 201 })
 }
