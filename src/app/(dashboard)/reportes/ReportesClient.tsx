@@ -28,6 +28,24 @@ interface Props {
   nivel: number
   /** Ticket de la mesa de ayuda desde el que se crea un reporte (/reportes?ticket=ID) */
   ticketOrigen?: { id: number; folio: string; cliente_id: number; asunto: string; descripcion: string } | null
+  /** Lo cobrado por reporte (Finanzas) */
+  cobrado?: Record<number, number>
+}
+
+/** Firmado = el cliente autorizó el trabajo y el monto → se debe cobrar. Se paga en Finanzas → Cobranza. */
+function EstadoCobro({ r, cobrado }: { r: Reporte; cobrado: number }) {
+  const total = Number(r.total)
+  if (!(total > 0)) return null
+  if (cobrado >= total - 0.009) {
+    return <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Pagado</span>
+  }
+  if (!r.firma_fecha) return null
+  return (
+    <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
+      title={cobrado > 0 ? `Cobrado ${fmt$(cobrado)} de ${fmt$(total)}` : 'Firmado por el cliente: pendiente de cobro'}>
+      {cobrado > 0 ? 'Pago parcial' : 'Por cobrar'}
+    </span>
+  )
 }
 
 const estadoConfig: Record<string, string> = {
@@ -79,7 +97,7 @@ interface MailRepState {
   ok: boolean
 }
 
-export default function ReportesClient({ reportes: inicial, clientes, tecnicos, nivel, ticketOrigen = null }: Props) {
+export default function ReportesClient({ reportes: inicial, clientes, tecnicos, nivel, ticketOrigen = null, cobrado = {} }: Props) {
   const router = useRouter()
   const [reportes, setReportes] = useState<Reporte[]>(inicial)
   // Si se llegó desde un ticket (/reportes?ticket=ID), el formulario abre ya precargado
@@ -317,6 +335,7 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
                     <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${estadoConfig[r.estado] ?? estadoConfig.abierto}`}>
                       {etiquetaEstado(r.estado)}
                     </span>
+                    <EstadoCobro r={r} cobrado={cobrado[r.id] ?? 0} />
                   </div>
                   <h3 className="mt-1 truncate font-semibold text-gray-900">{cliente}</h3>
                   <p className="truncate text-xs text-gray-500">{equipoStr}</p>
@@ -377,9 +396,12 @@ export default function ReportesClient({ reportes: inicial, clientes, tecnicos, 
                   <td className="px-3 py-2.5 text-xs text-gray-600 max-w-[200px] truncate">{equipoStr}</td>
                   <td className="px-3 py-2.5 text-xs text-gray-600">{tecnico}</td>
                   <td className="px-3 py-2.5">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${badgeCls}`}>
-                      {etiquetaEstado(r.estado)}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${badgeCls}`}>
+                        {etiquetaEstado(r.estado)}
+                      </span>
+                      <EstadoCobro r={r} cobrado={cobrado[r.id] ?? 0} />
+                    </div>
                   </td>
                   <td className="px-3 py-2.5 text-right font-semibold text-gray-900 whitespace-nowrap">
                     {fmt$(Number(r.total))}

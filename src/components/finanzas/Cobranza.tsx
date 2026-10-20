@@ -102,7 +102,7 @@ export default function Cobranza({ onCambio }: { onCambio?: () => void }) {
       ) : visibles.length === 0 ? (
         <div className="rounded-2xl border border-gray-200 bg-white">
           <EstadoVacio icono={<HandCoins size={22} />} titulo={items.length ? 'Sin resultados' : '¡Nadie te debe!'}
-            descripcion={items.length ? 'Prueba con otra búsqueda.' : 'Todas las cotizaciones aceptadas y reportes están cobrados.'} />
+            descripcion={items.length ? 'Prueba con otra búsqueda.' : 'Todas las cotizaciones aceptadas y los reportes firmados están cobrados.'} />
         </div>
       ) : (
         <ul className="space-y-2">

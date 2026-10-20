@@ -15,6 +15,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
     { data: clientes },
     { data: tecnicos },
     { data: { user } },
+    { data: pagos },
   ] = await Promise.all([
     supabase
       .from('reportes')
@@ -24,7 +25,11 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
     supabase.from('clientes').select('id, nombre, direccion, direcciones').eq('activo', true).order('nombre'),
     servicio.from('usuarios').select('id, nombre').eq('activo', true).order('nombre'),
     supabase.auth.getUser(),
+    // Lo cobrado de cada reporte (Finanzas → Cobranza): para mostrar "Pagado" / "Por cobrar"
+    servicio.from('movimientos').select('reporte_id, monto').eq('tipo', 'ingreso').not('reporte_id', 'is', null),
   ])
+  const cobrado: Record<number, number> = {}
+  for (const p of pagos ?? []) cobrado[p.reporte_id] = (cobrado[p.reporte_id] ?? 0) + Number(p.monto)
 
   // Mapear técnico desde la lista de usuarios usando tecnico_id
   const tecnicosMap = Object.fromEntries((tecnicos ?? []).map((t) => [t.id, t]))
@@ -55,6 +60,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
       tecnicos={tecnicos ?? []}
       nivel={perfil?.nivel ?? 2}
       ticketOrigen={ticketOrigen}
+      cobrado={cobrado}
     />
   )
 }

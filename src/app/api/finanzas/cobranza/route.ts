@@ -51,10 +51,12 @@ export async function POST(req: NextRequest) {
   const cot = esCot ? doc as { fecha: string; estado: string; aplica_iva: boolean; iva_monto: number } : null
   const rep = !esCot ? doc as { fecha_ingreso: string; fecha_entrega: string | null } : null
   const fechaDoc = cot?.fecha ?? rep?.fecha_entrega ?? rep?.fecha_ingreso ?? hoyMexico()
-  const conFactura = p.con_factura ?? !!cot?.aplica_iva
-  // IVA proporcional al pago si la cotización lo desglosa; si no, el 16 % incluido
+  const conFactura = p.con_factura ?? (!!cot?.aplica_iva || cot?.estado === 'facturada')
+  // IVA: proporcional al pago si la cotización lo desglosa. Cotización sin IVA capturado → se deja
+  // vacío para que contabilidad lo revise (no se inventa). Reportes: 16 % incluido en el total.
   const iva = !conFactura ? null
-    : cot?.aplica_iva && total > 0 ? redondear(Number(cot.iva_monto) * monto / total) : ivaIncluido(monto)
+    : cot ? (cot.aplica_iva && total > 0 ? redondear(Number(cot.iva_monto) * monto / total) : null)
+    : ivaIncluido(monto)
   const parcial = monto < saldo - 0.009 || cobrado > 0
 
   const { data: movimiento, error } = await supabase.from('movimientos').insert({

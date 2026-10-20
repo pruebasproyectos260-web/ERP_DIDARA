@@ -34,15 +34,20 @@ export interface PorCobrar {
   dias: number
 }
 
-/** Cotizaciones aceptadas/facturadas y reportes con importe que aún no se cobran por completo */
+/**
+ * Lo que se debe cobrar:
+ * - Cotizaciones aceptadas, aprobadas o facturadas (el cliente ya dijo que sí).
+ * - Reportes FIRMADOS por el cliente con importe (firmar = autorizar el trabajo y el monto).
+ * Menos lo que ya se registró como pagado en Finanzas.
+ */
 export async function cuentasPorCobrar(supabase: Supabase) {
   const [cots, reps, pagos] = await Promise.all([
     supabase.from('cotizaciones')
       .select('id, folio, fecha, estado, total, iva_monto, aplica_iva, cliente_id, cliente:clientes(nombre)')
       .in('estado', ['aceptada', 'aprobada', 'facturada']).gt('total', 0),
     supabase.from('reportes')
-      .select('id, folio, fecha_ingreso, fecha_entrega, estado, total, cliente_id, cliente:clientes(nombre)')
-      .gt('total', 0),
+      .select('id, folio, fecha_ingreso, fecha_entrega, firma_fecha, estado, total, cliente_id, cliente:clientes(nombre)')
+      .gt('total', 0).not('firma_fecha', 'is', null),
     supabase.from('movimientos').select('cotizacion_id, reporte_id, monto')
       .eq('tipo', 'ingreso').or('cotizacion_id.not.is.null,reporte_id.not.is.null'),
   ])
@@ -65,13 +70,13 @@ export async function cuentasPorCobrar(supabase: Supabase) {
         origen: 'cotizacion' as const, id: c.id, folio: c.folio, cliente_id: c.cliente_id,
         cliente: unir<{ nombre: string }>(c.cliente)?.nombre ?? 'Sin cliente',
         fecha: c.fecha, estado: c.estado, total: Number(c.total),
-        iva: c.aplica_iva ? Number(c.iva_monto ?? 0) : 0, con_factura: !!c.aplica_iva,
+        iva: c.aplica_iva ? Number(c.iva_monto ?? 0) : 0, con_factura: !!c.aplica_iva || c.estado === 'facturada',
         cobrado, saldo: redondear(Number(c.total) - cobrado), dias: dias(c.fecha),
       }
     }),
     ...(reps.data ?? []).map((r) => {
       const cobrado = redondear(pagadoRep.get(r.id) ?? 0)
-      const fecha = r.fecha_entrega ?? r.fecha_ingreso
+      const fecha = (r.firma_fecha as string | null)?.slice(0, 10) ?? r.fecha_entrega ?? r.fecha_ingreso
       return {
         origen: 'reporte' as const, id: r.id, folio: r.folio, cliente_id: r.cliente_id,
         cliente: unir<{ nombre: string }>(r.cliente)?.nombre ?? 'Sin cliente',

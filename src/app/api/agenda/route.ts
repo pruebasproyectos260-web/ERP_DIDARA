@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireNivel } from '@/lib/auth'
 import { CAMPOS, leerJson, pick } from '@/lib/campos'
+import { puedeVerEvento } from '@/lib/agenda'
 
 export async function GET(req: NextRequest) {
   const auth = await requireNivel()
@@ -20,7 +21,8 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ data })
+  // Cada quien ve solo los eventos donde es encargado (niveles 0 y 1 ven todos)
+  return NextResponse.json({ data: (data ?? []).filter((ev) => puedeVerEvento(ev, auth)) })
 }
 
 export async function POST(req: NextRequest) {
@@ -29,6 +31,7 @@ export async function POST(req: NextRequest) {
   const { supabase } = auth
   const body = pick(await leerJson(req), CAMPOS.eventos)
 
+  // responsable_id = quien creó el evento (los encargados van en "responsables")
   const { data, error } = await supabase
     .from('eventos')
     .insert({ ...body, responsable_id: auth.userId })

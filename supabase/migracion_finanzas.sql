@@ -94,6 +94,17 @@ FROM cotizaciones
 WHERE estado = 'pagada' AND total > 0 AND fecha IS NOT NULL
 ON CONFLICT (origen) DO NOTHING;
 
+-- Reportes completados/entregados SIN firma → se dan por cobrados (regla acordada: antes de
+-- la firma en línea, "completado" significaba que ya se cobró). Los firmados se cobran en Cobranza.
+INSERT INTO movimientos (tipo, fecha, categoria, descripcion, monto, cliente_id, reporte_id,
+                         revisado, importado, origen, created_at)
+SELECT 'ingreso', COALESCE(fecha_entrega, fecha_ingreso), 'Servicio', 'Reporte ' || folio, total,
+       cliente_id, id, TRUE, TRUE, 'reporte:' || id, NOW()
+FROM reportes
+WHERE estado IN ('completado', 'entregado') AND firma_fecha IS NULL AND total > 0
+  AND COALESCE(fecha_entrega, fecha_ingreso) IS NOT NULL
+ON CONFLICT (origen) DO NOTHING;
+
 -- Gastos fijos → pagos fijos del mes
 INSERT INTO fin_recurrentes (tipo, nombre, categoria, monto, dia, desde, notas, origen, created_at)
 SELECT 'gasto', nombre,

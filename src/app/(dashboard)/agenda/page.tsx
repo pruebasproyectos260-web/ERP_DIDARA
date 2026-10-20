@@ -7,6 +7,7 @@ import { borrar } from '@/lib/api-cliente'
 import { BotonIcono, BotonPrincipal, EncabezadoPagina } from '@/components/ui/Pagina'
 import type { Evento, Cliente, Usuario } from '@/types'
 import { aviso, confirmar } from '@/components/ui/Avisos'
+import { esEncargado } from '@/lib/agenda'
 
 const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
@@ -157,8 +158,7 @@ export default function AgendaPage() {
     const en3Dias = new Date(ahora.getTime() + 3 * 24 * 60 * 60 * 1000)
     return eventos.filter(ev => {
       const f = new Date(ev.fecha_inicio)
-      return f >= ahora && f <= en3Dias &&
-        ev.responsables?.split(',').map(n => n.trim()).includes(usuarioActual.nombre)
+      return f >= ahora && f <= en3Dias && esEncargado(ev.responsables, usuarioActual.nombre)
     })
   }, [usuarioActual, eventos])
 
