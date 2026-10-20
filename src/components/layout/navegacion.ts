@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, Package, FileText, Wrench, Calendar,
-  TrendingUp, Receipt, Settings, ClipboardList, Monitor, LifeBuoy,
+  Wallet, Settings, ClipboardList, Monitor, LifeBuoy,
 } from 'lucide-react'
 
 export interface ItemNav {
@@ -30,8 +30,8 @@ export const GRUPOS_NAV: GrupoNav[] = [
     { href: '/software',   label: 'Software',   icon: Monitor },
   ] },
   { titulo: 'Finanzas', items: [
-    { href: '/ventas', label: 'Ventas', icon: TrendingUp, ocultarDesdeNivel: 3 },
-    { href: '/gastos', label: 'Gastos', icon: Receipt,    ocultarDesdeNivel: 3 },
+    // Todos registran sus gastos; administración y contabilidad ven todo (ver lib/finanzas.ts)
+    { href: '/finanzas', label: 'Finanzas', icon: Wallet },
   ] },
   { titulo: 'Sistema', items: [
     { href: '/admin', label: 'Administración', icon: Settings, ocultarDesdeNivel: 2 },

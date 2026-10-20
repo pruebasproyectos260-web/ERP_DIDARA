@@ -7,6 +7,7 @@ import type { Sesion } from '@/lib/auth'
 export type Accion =
   | 'crear' | 'editar' | 'eliminar' | 'cambiar_estado' | 'firmar'
   | 'desactivar' | 'cambiar_contrasena' | 'respaldo'
+  | 'revisar' | 'registrar_pago'
 
 export async function registrarActividad(
   // userId null = acción de un cliente desde un enlace público (firma, portal de soporte)

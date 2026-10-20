@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireNivel } from '@/lib/auth'
 import { NIVEL } from '@/lib/nivel'
-import { errorValidacion, leerJson } from '@/lib/campos'
+import { errorValidacion, leerJson, soloEnviados } from '@/lib/campos'
 import { registrarActividad } from '@/lib/actividad'
 import { ESTADOS_CERRADOS, ETIQUETA_ESTADO, ETIQUETA_PRIORIDAD, esquemaCambioTicket } from '@/lib/tickets'
 import { avisarAsignacion, avisarResuelto, comentarioSistema, nombreCliente, type TicketFila } from '@/lib/tickets-servidor'
@@ -42,11 +42,8 @@ export async function PATCH(
   const body = await leerJson(req)
   const parsed = esquemaCambioTicket.safeParse(body)
   if (!parsed.success) return errorValidacion(parsed.error)
-  // Solo los campos que vinieron en la petición: zod convierte los de contacto ausentes en null
-  // y sin este filtro un simple cambio de estado borraría el nombre/correo/teléfono del cliente.
-  const cambios = Object.fromEntries(
-    Object.entries(parsed.data).filter(([campo]) => campo in body)
-  ) as typeof parsed.data
+  // Sin este filtro un simple cambio de estado borraría el nombre/correo/teléfono del cliente
+  const cambios = soloEnviados(parsed.data, body)
 
   const { data: previo } = await supabase.from('tickets').select(SELECT).eq('id', id).single()
   if (!previo) return NextResponse.json({ error: 'Ticket no encontrado' }, { status: 404 })

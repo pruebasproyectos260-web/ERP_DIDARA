@@ -24,39 +24,28 @@ export async function GET(req: NextRequest) {
       data: {
         cotizaciones: (cotizaciones ?? []).map((c) => ({ ...c, total: 0 })),
         reportes: (reportes ?? []).map((r) => ({ ...r, total: 0 })),
-        ingresosManuales: [],
-        gananciasFijas: [],
-        gastosFijos: [],
-        gastosVariables: [],
+        movimientos: [],
         mesKey, mes, anio, desde, hasta,
       }
     })
   }
 
+  // Dinero: lo que realmente entró y salió (Finanzas → movimientos)
   const [
     { data: cotizaciones },
     { data: reportes },
-    { data: ingresosManuales },
-    { data: gananciasFijas },
-    { data: gastosFijos },
-    { data: gastosVariables },
+    { data: movimientos },
   ] = await Promise.all([
     supabase.from('cotizaciones').select('id, folio, fecha, estado, total, ganancia_total, ganancia_real, pct_didara, cliente:clientes(id,nombre)').gte('fecha', `${anio}-01-01`).lte('fecha', `${anio}-12-31`),
     supabase.from('reportes').select('id, folio, fecha_ingreso, total, cliente:clientes(id,nombre), tipo_servicio').gte('fecha_ingreso', `${anio}-01-01`).lte('fecha_ingreso', `${anio}-12-31`),
-    supabase.from('ingresos_manuales').select('*').gte('fecha', `${anio}-01-01`).lte('fecha', `${anio}-12-31`),
-    supabase.from('ganancias_fijas').select('*'),
-    supabase.from('gastos_fijos').select('*'),
-    supabase.from('gastos_variables').select('*').gte('fecha', `${anio}-01-01`).lte('fecha', `${anio}-12-31`),
+    supabase.from('movimientos').select('tipo, fecha, monto').gte('fecha', `${anio}-01-01`).lte('fecha', `${anio}-12-31`),
   ])
 
   return NextResponse.json({
     data: {
       cotizaciones: cotizaciones ?? [],
       reportes: reportes ?? [],
-      ingresosManuales: ingresosManuales ?? [],
-      gananciasFijas: gananciasFijas ?? [],
-      gastosFijos: gastosFijos ?? [],
-      gastosVariables: gastosVariables ?? [],
+      movimientos: (movimientos ?? []).map((m) => ({ ...m, monto: Number(m.monto) })),
       mesKey,
       mes,
       anio,

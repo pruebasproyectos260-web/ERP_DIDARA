@@ -32,10 +32,7 @@ const CERRADAS = ['pagada', 'facturada', 'cancelada', 'rechazada']
 interface DashData {
   cotizaciones: { id: number; fecha: string; estado: string; total: number; ganancia_total?: number; ganancia_real?: number; pct_didara?: number }[]
   reportes: { id: number; fecha_ingreso: string; total: number }[]
-  ingresosManuales: { id: number; fecha: string; monto: number }[]
-  gananciasFijas: { id: number; monto: number; fecha_inicio?: string }[]
-  gastosFijos: { id: number; monto: number; fecha_inicio?: string }[]
-  gastosVariables: { id: number; fecha: string; monto: number }[]
+  movimientos: { tipo: 'gasto' | 'ingreso'; fecha: string; monto: number }[]
   mesKey: string; mes: number; anio: number; desde: string; hasta: string
 }
 
@@ -48,38 +45,20 @@ interface Props {
   nombre: string
 }
 
-function ganCot(c: { total: number; ganancia_real?: number; ganancia_total?: number; pct_didara?: number }) {
-  const base = c.ganancia_real ?? c.ganancia_total ?? c.total
-  return base * ((c.pct_didara ?? 100) / 100)
-}
-
 function isMesKey(fecha: string, mesKey: string): boolean {
   return (fecha ?? '').slice(0, 7) === mesKey
 }
 
 const claveMes = (anio: number, mes: number) => `${anio}-${String(mes).padStart(2, '0')}`
 
-/** Totales de un mes (mismas reglas que antes; se reutiliza para comparar con el mes anterior) */
+/** Totales de un mes (se reutiliza para comparar con el mes anterior). El dinero sale de Finanzas: lo cobrado y lo pagado. */
 function resumenMes(data: DashData | null, mk: string) {
   const cots = (data?.cotizaciones ?? []).filter((c) => isMesKey(c.fecha, mk))
   const reps = (data?.reportes ?? []).filter((r) => isMesKey(r.fecha_ingreso, mk))
-  const mans = (data?.ingresosManuales ?? []).filter((m) => isMesKey(m.fecha, mk))
-  const ganFijas = (data?.gananciasFijas ?? []).filter((g) => !g.fecha_inicio || g.fecha_inicio <= mk)
-  const gastFijos = (data?.gastosFijos ?? []).filter((g) => !g.fecha_inicio || g.fecha_inicio <= mk)
-  const gastVar = (data?.gastosVariables ?? []).filter((v) => isMesKey(v.fecha, mk))
-
-  const ingresos = cots.filter((c) => PAGADAS.includes(c.estado)).reduce((a, c) => a + ganCot(c), 0)
-    + reps.reduce((a, r) => a + (r.total ?? 0), 0)
-    + mans.reduce((a, m) => a + m.monto, 0)
-  const totalGanFijas = ganFijas.reduce((a, g) => a + g.monto, 0)
-  const totalGastosFijos = gastFijos.reduce((a, g) => a + g.monto, 0)
-  const totalGastosVar = gastVar.reduce((a, v) => a + v.monto, 0)
-  const gastos = totalGastosFijos + totalGastosVar
-
-  return {
-    cots, reps, mans, gastVar, ingresos, totalGanFijas, totalGastosFijos, totalGastosVar, gastos,
-    neta: ingresos + totalGanFijas - gastos,
-  }
+  const movs = (data?.movimientos ?? []).filter((m) => isMesKey(m.fecha, mk))
+  const ingresos = movs.filter((m) => m.tipo === 'ingreso').reduce((a, m) => a + m.monto, 0)
+  const gastos = movs.filter((m) => m.tipo === 'gasto').reduce((a, m) => a + m.monto, 0)
+  return { cots, reps, movs, ingresos, gastos, neta: ingresos - gastos }
 }
 
 /** Variación porcentual; null si no hay base para comparar */
@@ -127,40 +106,15 @@ export default function DashboardClient({ nivel, totalClientes, reportesAbiertos
   const semanas = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5']
   const ingresosSem = [0, 0, 0, 0, 0]
   const gastosSem   = [0, 0, 0, 0, 0]
-  const ingresoFijoPorSem = actual.totalGanFijas / 4
-  const gastoFijoPorSem   = actual.totalGastosFijos / 4
-  semanas.forEach((_, i) => { ingresosSem[i] += ingresoFijoPorSem; gastosSem[i] += gastoFijoPorSem })
   const getDiaSem = (fecha: string) => Math.min(Math.ceil(parseInt(fecha.slice(8, 10)) / 7) - 1, 4)
-  actual.cots.filter((c) => PAGADAS.includes(c.estado)).forEach((c) => { ingresosSem[getDiaSem(c.fecha)] += ganCot(c) })
-  actual.reps.forEach((r) => { ingresosSem[getDiaSem(r.fecha_ingreso)] += r.total ?? 0 })
-  actual.mans.forEach((m) => { ingresosSem[getDiaSem(m.fecha)] += m.monto })
-  actual.gastVar.forEach((v) => { gastosSem[getDiaSem(v.fecha)] += v.monto })
+  actual.movs.forEach((m) => { (m.tipo === 'ingreso' ? ingresosSem : gastosSem)[getDiaSem(m.fecha)] += m.monto })
 
-  // Ganancia neta anual
-  const ganAnio  = Array(12).fill(0)
-  const gastAnio = Array(12).fill(0)
-  for (let mi = 0; mi < 12; mi++) {
-    const mk = claveMes(anio, mi + 1)
-    ganAnio[mi]  += (data?.gananciasFijas ?? []).filter((g) => !g.fecha_inicio || g.fecha_inicio <= mk).reduce((a, g) => a + g.monto, 0)
-    gastAnio[mi] += (data?.gastosFijos ?? []).filter((g) => !g.fecha_inicio || g.fecha_inicio <= mk).reduce((a, g) => a + g.monto, 0)
-  }
-  ;(data?.cotizaciones ?? []).filter((c) => PAGADAS.includes(c.estado)).forEach((c) => {
-    const mi = parseInt(c.fecha.slice(5, 7)) - 1
-    if (mi >= 0 && mi < 12) ganAnio[mi] += ganCot(c)
-  })
-  ;(data?.reportes ?? []).forEach((r) => {
-    const mi = parseInt(r.fecha_ingreso.slice(5, 7)) - 1
-    if (mi >= 0 && mi < 12) ganAnio[mi] += r.total ?? 0
-  })
-  ;(data?.ingresosManuales ?? []).forEach((m) => {
+  // Resultado neto de cada mes del año
+  const netaAnio = Array(12).fill(0)
+  ;(data?.movimientos ?? []).forEach((m) => {
     const mi = parseInt(m.fecha.slice(5, 7)) - 1
-    if (mi >= 0 && mi < 12) ganAnio[mi] += m.monto
+    if (mi >= 0 && mi < 12) netaAnio[mi] += m.tipo === 'ingreso' ? m.monto : -m.monto
   })
-  ;(data?.gastosVariables ?? []).forEach((v) => {
-    const mi = parseInt(v.fecha.slice(5, 7)) - 1
-    if (mi >= 0 && mi < 12) gastAnio[mi] += v.monto
-  })
-  const netaAnio = ganAnio.map((g, i) => g - gastAnio[i])
 
   // ── Estilo de gráficas según el tema ────────────────────────────────────
   const colorTexto = oscuro ? '#94a3a1' : '#6b7280'
@@ -211,11 +165,11 @@ export default function DashboardClient({ nivel, totalClientes, reportesAbiertos
       <div className={`grid grid-cols-2 gap-3 sm:gap-4 ${esAdmin ? 'md:grid-cols-3 xl:grid-cols-6' : 'md:grid-cols-3'}`}>
         {esAdmin && <>
           <Indicador etiqueta={`Ingresos ${MESES_CORTOS[mes - 1]}`} valor={fmt(actual.ingresos)} cargando={loading}
-            detalle={`+${fmt(actual.totalGanFijas)} recurrentes`} icono={<TrendingUp size={17} />} tono="verde"
-            cambio={variacion(actual.ingresos, previo?.ingresos)} />
+            detalle="Cobrado en el mes" icono={<TrendingUp size={17} />} tono="verde"
+            cambio={variacion(actual.ingresos, previo?.ingresos)} href="/finanzas" />
           <Indicador etiqueta={`Gastos ${MESES_CORTOS[mes - 1]}`} valor={fmt(actual.gastos)} cargando={loading}
-            detalle={`Fijos: ${fmt(actual.totalGastosFijos)}`} icono={<TrendingDown size={17} />} tono="rojo"
-            cambio={variacion(actual.gastos, previo?.gastos)} cambioInvertido />
+            detalle="Pagado en el mes" icono={<TrendingDown size={17} />} tono="rojo"
+            cambio={variacion(actual.gastos, previo?.gastos)} cambioInvertido href="/finanzas?vista=movimientos" />
           <Indicador etiqueta="Ganancia neta" valor={fmt(actual.neta)} cargando={loading} destacado
             detalle={actual.neta >= 0 ? 'Resultado positivo' : 'Resultado negativo'} icono={<Wallet size={17} />}
             tono={actual.neta >= 0 ? 'marca' : 'rojo'} cambio={variacion(actual.neta, previo?.neta)} />

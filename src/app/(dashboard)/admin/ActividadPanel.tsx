@@ -19,7 +19,10 @@ const TABLAS: { valor: string; label: string }[] = [
   { valor: 'cotizaciones',      label: 'Cotizaciones' },
   { valor: 'reportes',          label: 'Reportes' },
   { valor: 'clientes',          label: 'Clientes' },
+  { valor: 'tickets',           label: 'Mesa de ayuda' },
   { valor: 'productos',         label: 'Inventario' },
+  { valor: 'movimientos',       label: 'Finanzas' },
+  { valor: 'fin_recurrentes',   label: 'Pagos y cobros fijos' },
   { valor: 'gastos_fijos',      label: 'Gastos fijos' },
   { valor: 'gastos_variables',  label: 'Gastos variables' },
   { valor: 'ingresos_manuales', label: 'Ingresos' },
@@ -41,6 +44,8 @@ const ACCIONES: Record<string, { label: string; cls: string }> = {
   desactivar:         { label: 'Desactivó',       cls: 'bg-red-100 text-red-700' },
   cambiar_contrasena: { label: 'Contraseña',      cls: 'bg-gray-100 text-gray-700' },
   respaldo:           { label: 'Respaldo',        cls: 'bg-teal-100 text-teal-700' },
+  revisar:            { label: 'Revisó',          cls: 'bg-emerald-100 text-emerald-700' },
+  registrar_pago:     { label: 'Registró pago',   cls: 'bg-emerald-100 text-emerald-700' },
 }
 
 function fechaHora(iso: string) {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { X, AlertCircle } from 'lucide-react'
 
 interface GastoProximo {
@@ -57,14 +58,16 @@ export default function GastosFijosAlert({ nivel }: { nivel: number }) {
         </div>
 
         <div className="px-5 py-4 space-y-3">
-          <p className="text-sm text-gray-500">Los siguientes gastos fijos vencen en los próximos 5 días:</p>
+          <p className="text-sm text-gray-500">Estos pagos fijos aún no se marcan como pagados:</p>
           <div className="space-y-2">
             {gastos.map((g) => (
-              <div key={g.id} className="flex items-center justify-between p-3 rounded-lg bg-orange-50 border border-orange-200">
+              <div key={`${g.id}-${g.fechaVencimiento}`} className="flex items-center justify-between p-3 rounded-lg bg-orange-50 border border-orange-200">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">{g.nombre}</p>
-                  <p className="text-xs text-orange-700 mt-0.5">
-                    {g.diasRestantes === 0
+                  <p className={`text-xs mt-0.5 ${g.diasRestantes < 0 ? 'font-semibold text-red-700' : 'text-orange-700'}`}>
+                    {g.diasRestantes < 0
+                      ? `Venció hace ${-g.diasRestantes} día${g.diasRestantes === -1 ? '' : 's'}`
+                      : g.diasRestantes === 0
                       ? 'Vence hoy'
                       : g.diasRestantes === 1
                       ? 'Vence mañana'
@@ -79,11 +82,15 @@ export default function GastosFijosAlert({ nivel }: { nivel: number }) {
           <p className="text-xs text-gray-400">Este aviso no se repetirá en esta sesión.</p>
         </div>
 
-        <div className="px-5 pb-4 flex justify-end">
+        <div className="px-5 pb-4 flex justify-end gap-2">
           <button onClick={cerrar}
-            className="px-4 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors">
+            className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
             Entendido
           </button>
+          <Link href="/finanzas?vista=fijos" onClick={cerrar}
+            className="px-4 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors">
+            Ver pagos del mes
+          </Link>
         </div>
       </div>
     </div>

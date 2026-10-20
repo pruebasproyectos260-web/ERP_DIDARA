@@ -85,6 +85,14 @@ export function limpiarBusqueda(q: string): string {
   return q.replace(/[,()*\\]/g, ' ').trim()
 }
 
+/**
+ * En ediciones parciales, conserva solo los campos que sí vinieron en la petición.
+ * zod rellena los ausentes (defaults, null) y sin este filtro se borrarían datos que nadie tocó.
+ */
+export function soloEnviados<T extends object>(datos: T, body: Fila): Partial<T> {
+  return Object.fromEntries(Object.entries(datos).filter(([campo]) => campo in body)) as Partial<T>
+}
+
 /** Responde 400 con el primer mensaje de validación de zod. */
 export function errorValidacion(error: z.ZodError) {
   return NextResponse.json({ error: error.issues[0]?.message ?? 'Datos inválidos' }, { status: 400 })
