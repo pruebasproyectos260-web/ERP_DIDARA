@@ -55,7 +55,8 @@ export default function Header({ user, perfil, esContador, onAbrirMenu }: Props)
     // Este dispositivo deja de recibir los avisos de esta cuenta (máx. 2 s de espera)
     await Promise.race([olvidarDispositivo(), new Promise((r) => setTimeout(r, 2000))])
     const supabase = createClient()
-    await supabase.auth.signOut()
+    // Solo este dispositivo: el "global" por defecto también sacaría a la persona de su compu y su celular
+    await supabase.auth.signOut({ scope: 'local' })
     router.push('/login')
     router.refresh()
   }

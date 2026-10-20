@@ -23,7 +23,7 @@ export interface Sesion {
 export async function requireNivel(nivelMaximo: number = NIVEL.RESTRINGIDO): Promise<Sesion | NextResponse> {
   const authClient = await createClient()
   const { data: { user } } = await authClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Tu sesión se cerró. Vuelve a iniciar sesión.' }, { status: 401 })
 
   const supabase = createServiceClient()
   const { data: perfil } = await supabase

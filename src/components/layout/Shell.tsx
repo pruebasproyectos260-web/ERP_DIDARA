@@ -6,6 +6,7 @@ import Sidebar from './Sidebar'
 import Header from './Header'
 import { COOKIE_SIDEBAR } from './navegacion'
 import { useNovedadesTickets } from './useNovedadesTickets'
+import { useSesionCaducada } from './useSesionCaducada'
 
 interface Props {
   user: SupabaseUser
@@ -23,6 +24,7 @@ export default function Shell({ user, perfil, esContador, colapsadoInicial, cont
   const [colapsado, setColapsado] = useState(colapsadoInicial)
   const [menuMovil, setMenuMovil] = useState(false)
   const ticketsActivos = useNovedadesTickets(contadoresIniciales?.['/tickets'] ?? 0)
+  useSesionCaducada()
   const contadores = { ...contadoresIniciales, '/tickets': ticketsActivos }
 
   function alternarColapso() {

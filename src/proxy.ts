@@ -65,7 +65,7 @@ export async function proxy(request: NextRequest) {
 
   if (!user && !isPublic) {
     if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+      return NextResponse.json({ error: 'Tu sesión se cerró. Vuelve a iniciar sesión.' }, { status: 401 })
     }
     const url = request.nextUrl.clone()
     url.pathname = '/login'
