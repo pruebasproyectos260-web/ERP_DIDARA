@@ -131,6 +131,15 @@ export default function TicketsClient({ ticketsIniciales, usuarios, clientes, ni
     avisarCambioTickets()
   }
 
+  async function eliminarTicket(t: Ticket) {
+    if (!(await confirmar({ titulo: `¿Eliminar el ticket ${t.folio}?`, mensaje: `"${t.asunto}". Se borra también su seguimiento. Esta acción no se puede deshacer.`, peligro: true }))) return
+    if (!(await borrar(`/api/tickets/${t.id}`, 'No se pudo eliminar el ticket'))) return
+    setTickets((p) => p.filter((x) => x.id !== t.id))
+    if (abiertoId === t.id) setAbiertoId(null)
+    aviso.exito(`Ticket ${t.folio} eliminado`)
+    avisarCambioTickets()
+  }
+
   const recargarLista = useCallback(async () => {
     const r = await fetch('/api/tickets').catch(() => null)
     if (!r?.ok) return
@@ -192,9 +201,9 @@ export default function TicketsClient({ ticketsIniciales, usuarios, clientes, ni
             const Origen = ICONO_ORIGEN[t.origen] ?? Globe
             const asignado = t.asignado_a ? nombreUsuario[t.asignado_a] : null
             return (
-              <li key={t.id} className="border-b border-gray-100 last:border-0">
+              <li key={t.id} className="group relative flex items-start border-b border-gray-100 last:border-0">
                 <button onClick={() => setAbiertoId(t.id)}
-                  className="relative flex w-full items-start gap-3 py-3.5 pl-5 pr-4 text-left transition-colors hover:bg-gray-50">
+                  className="relative flex min-w-0 flex-1 items-start gap-3 py-3.5 pl-5 pr-4 text-left transition-colors hover:bg-gray-50">
                   <span className={`absolute inset-y-3 left-0 w-1 rounded-r-full ${COLOR_PRIORIDAD[t.prioridad]}`} title={`Prioridad ${ETIQUETA_PRIORIDAD[t.prioridad]}`} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -216,6 +225,12 @@ export default function TicketsClient({ ticketsIniciales, usuarios, clientes, ni
                       : !ESTADOS_CERRADOS.includes(t.estado) && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500">Sin asignar</span>}
                   </div>
                 </button>
+                {nivel <= 1 && (
+                  <BotonIcono titulo={`Eliminar ${t.folio}`} tono="peligro" onClick={() => eliminarTicket(t)}
+                    className="mr-2 mt-3 shrink-0 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:focus-visible:opacity-100">
+                    <Trash2 size={16} />
+                  </BotonIcono>
+                )}
               </li>
             )
           })}

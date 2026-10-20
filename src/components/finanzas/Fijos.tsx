@@ -5,7 +5,7 @@ import { Check, ChevronDown, Loader2, Pencil, Plus, Repeat, Trash2, X } from 'lu
 import { aviso, confirmar } from '@/components/ui/Avisos'
 import { EstadoVacio } from '@/components/ui/Pagina'
 import {
-  CATEGORIAS_GASTO, CATEGORIAS_INGRESO, METODOS_PAGO, formatoMoneda, hoyISO, mesActual, nombreMes,
+  CATEGORIAS_GASTO, CATEGORIAS_INGRESO, METODOS_PAGO, formatoMoneda, hoyISO, ivaSobre, mesActual, montoFijoReal, nombreMes,
   type TipoMovimiento,
 } from '@/lib/finanzas'
 import SelectorMes from './SelectorMes'
@@ -147,7 +147,7 @@ function Seccion({ tipo, mes, lista, onMarcar, onDesmarcar, onEditar, onAgregar 
 }) {
   const hoy = hoyISO()
   const hechos = lista.filter((f) => f.hecho)
-  const faltan = lista.filter((f) => !f.hecho).reduce((a, f) => a + f.monto, 0)
+  const faltan = lista.filter((f) => !f.hecho).reduce((a, f) => a + montoFijoReal(f), 0)
   const pct = lista.length ? (hechos.length / lista.length) * 100 : 0
   const esPago = tipo === 'gasto'
 
@@ -195,8 +195,13 @@ function Seccion({ tipo, mes, lista, onMarcar, onDesmarcar, onEditar, onAgregar 
                   </span>
                   <span className={`block truncate text-xs ${vencido ? 'font-medium text-red-600' : 'text-gray-500'}`}>{estado}</span>
                 </span>
-                <span className={`shrink-0 text-sm font-semibold tabular-nums ${f.hecho ? 'text-gray-400' : 'text-gray-900'}`}>
-                  {formatoMoneda(f.hecho?.monto ?? f.monto)}
+                <span className="shrink-0 text-right">
+                  <span className={`block text-sm font-semibold tabular-nums ${f.hecho ? 'text-gray-400' : 'text-gray-900'}`}>
+                    {formatoMoneda(f.hecho?.monto ?? montoFijoReal(f))}
+                  </span>
+                  {f.tipo === 'ingreso' && f.con_factura && !f.hecho && (
+                    <span className="block text-[11px] text-gray-400">{formatoMoneda(f.monto)} + IVA</span>
+                  )}
                 </span>
                 <button onClick={() => onEditar(f)} aria-label={`Editar ${f.nombre}`} className="shrink-0 rounded-lg p-1.5 text-gray-300 hover:bg-gray-100 hover:text-gray-700">
                   <Pencil size={14} />
@@ -232,6 +237,10 @@ function MarcarHecho({ fijo: f, mes, onCerrar, onListo }: { fijo: Fijo; mes: str
   const [metodo, setMetodo] = useState(f.metodo_pago ?? '')
   const [guardando, setGuardando] = useState(false)
   const esPago = f.tipo === 'gasto'
+  // Cobro con factura: el monto es sin IVA y el IVA se suma
+  const sumaIva = !esPago && f.con_factura
+  const importe = parseFloat(monto) || 0
+  const iva = sumaIva ? ivaSobre(importe) : 0
 
   async function guardar() {
     setGuardando(true)
@@ -256,11 +265,17 @@ function MarcarHecho({ fijo: f, mes, onCerrar, onListo }: { fijo: Fijo; mes: str
       </button>}>
       <p className="text-sm text-gray-500">{nombreMes(mes)}</p>
       <div className="grid grid-cols-2 gap-3">
-        <label className="block"><span className="mb-1 block text-xs font-medium text-gray-500">Monto</span>
+        <label className="block"><span className="mb-1 block text-xs font-medium text-gray-500">{sumaIva ? 'Monto sin IVA' : 'Monto'}</span>
           <input value={monto} onChange={(e) => setMonto(e.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" className={inputCls} /></label>
         <label className="block"><span className="mb-1 block text-xs font-medium text-gray-500">Fecha</span>
           <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className={inputCls} /></label>
       </div>
+      {sumaIva && (
+        <div className="rounded-xl bg-gray-50 px-3.5 py-2.5 text-sm">
+          <div className="flex justify-between text-gray-600"><span>IVA 16 % (con factura)</span><span className="tabular-nums">{formatoMoneda(iva)}</span></div>
+          <div className="mt-1 flex justify-between border-t border-gray-200 pt-1 font-semibold text-gray-900"><span>Recibes</span><span className="tabular-nums">{formatoMoneda(importe + iva)}</span></div>
+        </div>
+      )}
       <div>
         <span className="mb-1 block text-xs font-medium text-gray-500">{esPago ? '¿Con qué se pagó?' : '¿Cómo se cobró?'}</span>
         <div className="flex flex-wrap gap-1.5">
@@ -364,7 +379,7 @@ function FormFijo({ fijo: f, tipoInicial, clientes, onCerrar, onListo }: {
             {[...categorias, ...(form.categoria && !(categorias as readonly string[]).includes(form.categoria) ? [form.categoria] : [])]
               .map((c) => <option key={c} value={c}>{c}</option>)}
           </select></label>
-        <label className="block"><span className="mb-1 block text-xs font-medium text-gray-500">Monto por mes *</span>
+        <label className="block"><span className="mb-1 block text-xs font-medium text-gray-500">{form.tipo === 'ingreso' ? 'Monto por mes sin IVA *' : 'Monto por mes *'}</span>
           <input value={form.monto} onChange={(e) => set('monto', e.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" className={inputCls} /></label>
         <label className="block"><span className="mb-1 block text-xs font-medium text-gray-500">Día de {form.tipo === 'gasto' ? 'pago' : 'cobro'}</span>
           <input type="number" min={1} max={31} value={form.dia} onChange={(e) => set('dia', e.target.value)} className={inputCls} placeholder="1–31" /></label>
@@ -386,7 +401,8 @@ function FormFijo({ fijo: f, tipoInicial, clientes, onCerrar, onListo }: {
           {METODOS_PAGO.map((m) => <option key={m} value={m}>{m}</option>)}
         </select></label>
       <label className="flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" checked={form.con_factura} onChange={(e) => set('con_factura', e.target.checked)} className="rounded" /> Con factura
+        <input type="checkbox" checked={form.con_factura} onChange={(e) => set('con_factura', e.target.checked)} className="rounded" />
+        {form.tipo === 'ingreso' ? 'Con factura (se le suma el IVA al cobrar)' : 'Con factura (el monto ya incluye IVA)'}
       </label>
       <label className="block"><span className="mb-1 block text-xs font-medium text-gray-500">Notas</span>
         <input value={form.notas} onChange={(e) => set('notas', e.target.value)} className={inputCls} /></label>

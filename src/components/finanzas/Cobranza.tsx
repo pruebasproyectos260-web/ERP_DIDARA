@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react'
 import { FileText, HandCoins, History, Loader2, Wrench, X } from 'lucide-react'
 import { aviso, confirmar } from '@/components/ui/Avisos'
 import { Buscador, EstadoVacio, Segmentado } from '@/components/ui/Pagina'
-import { METODOS_PAGO, formatoMoneda, hoyISO } from '@/lib/finanzas'
+import { METODOS_PAGO, formatoMoneda, hoyISO, redondear } from '@/lib/finanzas'
+
+// Los importes se manejan SIN IVA; si el cobro lleva factura se le suma el IVA (ver lib/finanzas.ts).
 
 interface PorCobrar {
   origen: 'cotizacion' | 'reporte'
@@ -14,11 +16,14 @@ interface PorCobrar {
   cliente: string
   fecha: string
   estado: string
-  total: number
-  iva: number
+  base: number
+  tasa_iva: number
   con_factura: boolean
+  cobrado_base: number
   cobrado: number
+  saldo_base: number
   saldo: number
+  total: number
   dias: number
 }
 
@@ -29,6 +34,7 @@ const ESTADO: Record<string, string> = {
   abierto: 'Abierto', en_proceso: 'En proceso', completado: 'Completado', entregado: 'Entregado',
 }
 const fechaCorta = (f: string) => new Date(`${f}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
+const pct = (tasa: number) => `${Math.round(tasa * 100)} %`
 
 function antiguedad(dias: number) {
   if (dias > 60) return { texto: `hace ${dias} días`, cls: 'bg-red-100 text-red-700' }
@@ -57,7 +63,7 @@ export default function Cobranza({ onCambio }: { onCambio?: () => void }) {
   async function yaCobrado(i: PorCobrar) {
     if (!(await confirmar({
       titulo: `¿${i.folio} ya estaba cobrado?`,
-      mensaje: `Se registra como cobrado (${formatoMoneda(i.saldo)}) con la fecha del documento, ${fechaCorta(i.fecha)}, para que no cuente como ingreso de este mes.`,
+      mensaje: `Se registra como cobrado (${formatoMoneda(i.saldo)}${i.con_factura ? ' con IVA' : ''}) con la fecha del documento, ${fechaCorta(i.fecha)}, para que no cuente como ingreso de este mes.`,
       textoConfirmar: 'Sí, ya estaba cobrado',
     }))) return
     const r = await fetch('/api/finanzas/cobranza', {
@@ -82,7 +88,7 @@ export default function Cobranza({ onCambio }: { onCambio?: () => void }) {
         <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Te deben</p>
           <p className="text-2xl font-bold tabular-nums text-brand-700">{formatoMoneda(total)}</p>
-          <p className="text-xs text-gray-500">{visibles.length} documento{visibles.length === 1 ? '' : 's'}</p>
+          <p className="text-xs text-gray-500">{visibles.length} documento{visibles.length === 1 ? '' : 's'} · con IVA donde hay factura</p>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-400">De hace más de 30 días</p>
@@ -108,7 +114,7 @@ export default function Cobranza({ onCambio }: { onCambio?: () => void }) {
         <ul className="space-y-2">
           {visibles.map((i) => {
             const edad = antiguedad(i.dias)
-            const pct = i.total ? (i.cobrado / i.total) * 100 : 0
+            const avance = i.base ? (i.cobrado_base / i.base) * 100 : 0
             return (
               <li key={`${i.origen}-${i.id}`} className="rounded-2xl border border-gray-200 bg-white p-4">
                 <div className="flex items-start gap-3">
@@ -123,17 +129,19 @@ export default function Cobranza({ onCambio }: { onCambio?: () => void }) {
                     </div>
                     <p className="mt-1 truncate font-medium text-gray-900">{i.cliente}</p>
                     <p className="text-xs text-gray-500">
-                      Total {formatoMoneda(i.total)}{i.cobrado > 0 && <> · cobrado {formatoMoneda(i.cobrado)}</>}
+                      {formatoMoneda(i.base)} sin IVA{i.con_factura && <> · {formatoMoneda(i.total)} con IVA</>}
+                      {i.cobrado > 0 && <> · cobrado {formatoMoneda(i.cobrado)}</>}
                     </p>
                     {i.cobrado > 0 && (
                       <div className="mt-2 h-1.5 max-w-xs overflow-hidden rounded-full bg-gray-100">
-                        <div className="h-full rounded-full bg-green-500" style={{ width: `${pct}%` }} />
+                        <div className="h-full rounded-full bg-green-500" style={{ width: `${avance}%` }} />
                       </div>
                     )}
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-[11px] text-gray-400">Pendiente</p>
                     <p className="text-lg font-bold tabular-nums text-gray-900">{formatoMoneda(i.saldo)}</p>
+                    <p className="text-[11px] text-gray-400">{i.con_factura ? 'IVA incluido' : 'sin factura'}</p>
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap justify-end gap-2">
@@ -165,13 +173,15 @@ export default function Cobranza({ onCambio }: { onCambio?: () => void }) {
 }
 
 function RegistrarPago({ item: i, onCerrar, onListo }: { item: PorCobrar; onCerrar: () => void; onListo: (liquidado: boolean) => void }) {
-  const [monto, setMonto] = useState(String(i.saldo))
+  const [base, setBase] = useState(String(i.saldo_base))
   const [fecha, setFecha] = useState(hoyISO())
   const [metodo, setMetodo] = useState('Transferencia')
   const [conFactura, setConFactura] = useState(i.con_factura)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
-  const importe = parseFloat(monto) || 0
+  const importe = parseFloat(base) || 0
+  const iva = conFactura ? redondear(importe * i.tasa_iva) : 0
+  const recibido = redondear(importe + iva)
   const inputCls = 'w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none'
 
   async function guardar() {
@@ -198,19 +208,28 @@ function RegistrarPago({ item: i, onCerrar, onListo }: { item: PorCobrar; onCerr
         <div className="flex items-start justify-between px-5 pb-2 pt-4">
           <div>
             <h2 className="font-semibold text-gray-900">Registrar pago · {i.folio}</h2>
-            <p className="text-sm text-gray-500">{i.cliente} · pendiente {formatoMoneda(i.saldo)}</p>
+            <p className="text-sm text-gray-500">{i.cliente} · pendiente {formatoMoneda(i.saldo_base)} sin IVA</p>
           </div>
           <button onClick={onCerrar} aria-label="Cerrar" className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100"><X size={20} /></button>
         </div>
         <div className="space-y-4 px-5 pb-4">
           <div className="grid grid-cols-2 gap-3">
-            <label className="block"><span className="mb-1 block text-xs font-medium text-gray-500">Monto recibido</span>
-              <input value={monto} onChange={(e) => setMonto(e.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" className={inputCls} /></label>
+            <label className="block"><span className="mb-1 block text-xs font-medium text-gray-500">Importe sin IVA</span>
+              <input value={base} onChange={(e) => setBase(e.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" className={inputCls} /></label>
             <label className="block"><span className="mb-1 block text-xs font-medium text-gray-500">Fecha</span>
               <input type="date" value={fecha} max={hoyISO()} onChange={(e) => setFecha(e.target.value)} className={inputCls} /></label>
           </div>
-          {importe > 0 && importe < i.saldo && (
-            <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">Pago parcial: quedará pendiente {formatoMoneda(i.saldo - importe)}.</p>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" checked={conFactura} onChange={(e) => setConFactura(e.target.checked)} className="rounded" />
+            Con factura (se suma IVA {pct(i.tasa_iva)})
+          </label>
+          <div className="rounded-xl bg-gray-50 px-3.5 py-2.5 text-sm">
+            <div className="flex justify-between text-gray-600"><span>Importe</span><span className="tabular-nums">{formatoMoneda(importe)}</span></div>
+            {conFactura && <div className="flex justify-between text-gray-600"><span>IVA {pct(i.tasa_iva)}</span><span className="tabular-nums">{formatoMoneda(iva)}</span></div>}
+            <div className="mt-1 flex justify-between border-t border-gray-200 pt-1 font-semibold text-gray-900"><span>Recibes</span><span className="tabular-nums">{formatoMoneda(recibido)}</span></div>
+          </div>
+          {importe > 0 && importe < i.saldo_base - 0.009 && (
+            <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">Pago parcial: quedarán pendientes {formatoMoneda(i.saldo_base - importe)} sin IVA.</p>
           )}
           <div>
             <span className="mb-1 block text-xs font-medium text-gray-500">¿Cómo pagó?</span>
@@ -223,15 +242,12 @@ function RegistrarPago({ item: i, onCerrar, onListo }: { item: PorCobrar; onCerr
               ))}
             </div>
           </div>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" checked={conFactura} onChange={(e) => setConFactura(e.target.checked)} className="rounded" /> Se facturó
-          </label>
           {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">{error}</p>}
         </div>
         <div className="border-t border-gray-100 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <button onClick={guardar} disabled={guardando || !(importe > 0) || importe > i.saldo + 0.009}
+          <button onClick={guardar} disabled={guardando || !(importe > 0) || importe > i.saldo_base + 0.009}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 py-3 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60">
-            {guardando && <Loader2 size={16} className="animate-spin" />} Registrar {formatoMoneda(importe)}
+            {guardando && <Loader2 size={16} className="animate-spin" />} Registrar {formatoMoneda(recibido)}
           </button>
         </div>
       </div>

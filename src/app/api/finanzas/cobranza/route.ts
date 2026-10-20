@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireNivel } from '@/lib/auth'
 import { errorValidacion, leerJson } from '@/lib/campos'
 import { registrarActividad } from '@/lib/actividad'
-import { esquemaPago, faltaMigracionFinanzas, formatoMoneda, hoyMexico, ivaIncluido, redondear } from '@/lib/finanzas'
-import { cuentasPorCobrar, soloFinanzas, SELECT_MOVIMIENTO } from '@/lib/finanzas-servidor'
+import { esquemaPago, faltaMigracionFinanzas, formatoMoneda, hoyMexico, redondear } from '@/lib/finanzas'
+import { baseDeDocumento, cuentasPorCobrar, soloFinanzas, sumarCobrado, SELECT_MOVIMIENTO } from '@/lib/finanzas-servidor'
 
-/** Lo que nos deben: cotizaciones aceptadas/facturadas y reportes con importe sin cobrar por completo */
+/** Lo que nos deben: cotizaciones aceptadas/facturadas y reportes firmados sin cobrar por completo */
 export async function GET() {
   const auth = await requireNivel()
   if (auth instanceof NextResponse) return auth
@@ -20,7 +20,10 @@ export async function GET() {
   return NextResponse.json({ data })
 }
 
-/** Registrar un pago recibido (puede ser parcial) */
+/**
+ * Registrar un pago recibido (puede ser parcial).
+ * "monto" es el importe SIN IVA que se abona; con factura se le suma el IVA (ver lib/finanzas.ts).
+ */
 export async function POST(req: NextRequest) {
   const auth = await requireNivel()
   if (auth instanceof NextResponse) return auth
@@ -38,26 +41,24 @@ export async function POST(req: NextRequest) {
     : (await supabase.from('reportes').select('id, folio, fecha_ingreso, fecha_entrega, total, cliente_id').eq('id', p.id).single()).data
   if (!doc) return NextResponse.json({ error: 'Documento no encontrado' }, { status: 404 })
 
-  const { data: pagos } = await supabase.from('movimientos').select('monto')
+  const { data: pagos } = await supabase.from('movimientos').select('monto, iva')
     .eq('tipo', 'ingreso').eq(esCot ? 'cotizacion_id' : 'reporte_id', p.id)
-  const total = Number(doc.total)
-  const cobrado = redondear((pagos ?? []).reduce((a, x) => a + Number(x.monto), 0))
-  const saldo = redondear(total - cobrado)
-  if (saldo <= 0) return NextResponse.json({ error: `${doc.folio} ya está cobrado por completo` }, { status: 409 })
+  const { base, tasa, conFactura: facturaPorDefecto } = baseDeDocumento(doc, esCot)
+  const { cobradoBase } = sumarCobrado(pagos ?? [])
+  const saldoBase = redondear(base - cobradoBase)
+  if (saldoBase <= 0.009) return NextResponse.json({ error: `${doc.folio} ya está cobrado por completo` }, { status: 409 })
 
-  const monto = p.ya_cobrado ? saldo : (p.monto ?? saldo)
-  if (monto > saldo + 0.009) return NextResponse.json({ error: `El pago es mayor que lo pendiente (${formatoMoneda(saldo)})` }, { status: 400 })
+  const abono = p.ya_cobrado ? saldoBase : (p.monto ?? saldoBase)
+  if (abono > saldoBase + 0.009) return NextResponse.json({ error: `El pago es mayor que lo pendiente (${formatoMoneda(saldoBase)} sin IVA)` }, { status: 400 })
 
-  const cot = esCot ? doc as { fecha: string; estado: string; aplica_iva: boolean; iva_monto: number } : null
+  const conFactura = p.con_factura ?? facturaPorDefecto
+  const iva = conFactura ? redondear(abono * tasa) : null
+  const monto = redondear(abono + (iva ?? 0)) // lo que realmente recibimos
+
+  const cot = esCot ? doc as { fecha: string; estado: string } : null
   const rep = !esCot ? doc as { fecha_ingreso: string; fecha_entrega: string | null } : null
   const fechaDoc = cot?.fecha ?? rep?.fecha_entrega ?? rep?.fecha_ingreso ?? hoyMexico()
-  const conFactura = p.con_factura ?? (!!cot?.aplica_iva || cot?.estado === 'facturada')
-  // IVA: proporcional al pago si la cotización lo desglosa. Cotización sin IVA capturado → se deja
-  // vacío para que contabilidad lo revise (no se inventa). Reportes: 16 % incluido en el total.
-  const iva = !conFactura ? null
-    : cot ? (cot.aplica_iva && total > 0 ? redondear(Number(cot.iva_monto) * monto / total) : null)
-    : ivaIncluido(monto)
-  const parcial = monto < saldo - 0.009 || cobrado > 0
+  const parcial = abono < saldoBase - 0.009 || cobradoBase > 0
 
   const { data: movimiento, error } = await supabase.from('movimientos').insert({
     tipo: 'ingreso',
@@ -80,15 +81,18 @@ export async function POST(req: NextRequest) {
   }).select(SELECT_MOVIMIENTO).single()
   if (error) return NextResponse.json({ error: 'No se pudo registrar el pago' }, { status: 500 })
 
-  const nuevoSaldo = redondear(saldo - monto)
+  const nuevoSaldoBase = redondear(saldoBase - abono)
   await registrarActividad(auth, 'registrar_pago', esCot ? 'cotizaciones' : 'reportes', doc.id,
-    `${doc.folio}: ${p.ya_cobrado ? 'ya estaba cobrado' : `pago de ${formatoMoneda(monto)}`}${nuevoSaldo > 0 ? ` · resta ${formatoMoneda(nuevoSaldo)}` : ' · liquidado'}`)
+    `${doc.folio}: ${p.ya_cobrado ? 'ya estaba cobrado' : `pago de ${formatoMoneda(monto)}${iva ? ` (IVA ${formatoMoneda(iva)})` : ''}`}` +
+    (nuevoSaldoBase > 0.009 ? ` · resta ${formatoMoneda(nuevoSaldoBase)} sin IVA` : ' · liquidado'))
 
   // Cotización liquidada → pasa a "pagada"
-  if (cot && nuevoSaldo <= 0.009 && cot.estado !== 'pagada') {
+  if (cot && nuevoSaldoBase <= 0.009 && cot.estado !== 'pagada') {
     await supabase.from('cotizaciones').update({ estado: 'pagada', updated_at: new Date().toISOString() }).eq('id', doc.id)
     await registrarActividad(auth, 'cambiar_estado', 'cotizaciones', doc.id, `${doc.folio}: ${cot.estado} → pagada (cobranza)`)
   }
 
-  return NextResponse.json({ data: { movimiento, saldo: Math.max(0, nuevoSaldo), liquidado: nuevoSaldo <= 0.009 } }, { status: 201 })
+  return NextResponse.json({
+    data: { movimiento, saldo_base: Math.max(0, nuevoSaldoBase), liquidado: nuevoSaldoBase <= 0.009 },
+  }, { status: 201 })
 }

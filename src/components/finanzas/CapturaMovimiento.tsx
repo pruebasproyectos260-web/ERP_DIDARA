@@ -5,8 +5,8 @@ import { BadgeCheck, Camera, FileText, Loader2, Trash2, X } from 'lucide-react'
 import { aviso, confirmar } from '@/components/ui/Avisos'
 import { comprimirImagen } from '@/lib/comprimir-imagen'
 import {
-  CATEGORIAS_GASTO, CATEGORIAS_INGRESO, METODOS_PAGO, colorCategoria, formatoMoneda, hoyISO, ivaIncluido,
-  type Movimiento, type TipoMovimiento,
+  CATEGORIAS_GASTO, CATEGORIAS_INGRESO, METODOS_PAGO, colorCategoria, formatoMoneda, hoyISO, ivaIncluido, ivaSobre,
+  redondear, type Movimiento, type TipoMovimiento,
 } from '@/lib/finanzas'
 import { BurbujaCategoria } from './categorias'
 
@@ -35,7 +35,9 @@ interface Props {
 export default function CapturaMovimiento({ movimiento: m, completo, clientes = [], tipoInicial = 'gasto', onCerrar, onGuardado, onEliminado }: Props) {
   const soloLectura = !!m && !completo && m.revisado
   const [tipo, setTipo] = useState<TipoMovimiento>(m?.tipo ?? tipoInicial)
-  const [montoTexto, setMontoTexto] = useState(m ? String(m.monto) : '')
+  // Gasto: lo que se pagó (IVA incluido). Ingreso: el precio SIN IVA (con factura el IVA se suma).
+  const [montoTexto, setMontoTexto] = useState(!m ? ''
+    : String(m.tipo === 'ingreso' && m.con_factura ? redondear(m.monto - (m.iva ?? 0)) : m.monto))
   const [categoria, setCategoria] = useState(m?.categoria ?? '')
   const [fecha, setFecha] = useState(m?.fecha ?? hoyISO())
   const [metodo, setMetodo] = useState<string>(() => {
@@ -56,7 +58,11 @@ export default function CapturaMovimiento({ movimiento: m, completo, clientes = 
   const inputArchivo = useRef<HTMLInputElement>(null)
 
   const monto = leerNumero(montoTexto)
-  const ivaMostrado = ivaTocado ? ivaTexto : conFactura && monto > 0 ? ivaIncluido(monto).toFixed(2) : ''
+  const ivaSugerido = tipo === 'gasto' ? ivaIncluido(monto) : ivaSobre(monto)
+  const ivaMostrado = ivaTocado ? ivaTexto : conFactura && monto > 0 ? ivaSugerido.toFixed(2) : ''
+  const ivaNum = conFactura && ivaMostrado ? leerNumero(ivaMostrado) : 0
+  // Lo que realmente entra o sale: en cobros con factura, precio + IVA
+  const montoFinal = tipo === 'ingreso' ? redondear(monto + ivaNum) : monto
   const categorias = tipo === 'gasto' ? CATEGORIAS_GASTO : CATEGORIAS_INGRESO
   // Categorías viejas que ya no están en la lista (p. ej. tipos escritos a mano) se siguen mostrando
   const opciones = categoria && !(categorias as readonly string[]).includes(categoria) ? [...categorias, categoria] : categorias
@@ -100,14 +106,14 @@ export default function CapturaMovimiento({ movimiento: m, completo, clientes = 
     setError('')
     if (!(monto > 0)) return setError('Escribe el monto')
     if (!categoria) return setError('Elige una categoría')
-    const iva = conFactura && ivaMostrado ? leerNumero(ivaMostrado) : null
+    const iva = conFactura && ivaMostrado ? ivaNum : null
     setGuardando(true)
     try {
       const r = await fetch(m ? `/api/finanzas/movimientos/${m.id}` : '/api/finanzas/movimientos', {
         method: m ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tipo, fecha, categoria, monto,
+          tipo, fecha, categoria, monto: montoFinal,
           descripcion: descripcion.trim() || null,
           proveedor: proveedor.trim() || null,
           metodo_pago: metodo || null,
@@ -176,7 +182,7 @@ export default function CapturaMovimiento({ movimiento: m, completo, clientes = 
 
           {/* Monto */}
           <label className="block text-center">
-            <span className="text-xs font-medium uppercase tracking-wide text-gray-400">Monto</span>
+            <span className="text-xs font-medium uppercase tracking-wide text-gray-400">{esGasto ? 'Monto' : 'Precio sin IVA'}</span>
             <div className={`mt-1 flex items-baseline justify-center gap-1 ${acento}`}>
               <span className="text-3xl font-semibold">{esGasto ? '−' : '+'}$</span>
               <input value={montoTexto} onChange={(e) => setMontoTexto(e.target.value.replace(/[^\d.,]/g, ''))}
@@ -185,6 +191,11 @@ export default function CapturaMovimiento({ movimiento: m, completo, clientes = 
                 style={{ width: `${Math.min(Math.max(montoTexto.length, 4), 11) + 0.5}ch` }}
                 className="bg-transparent text-left text-5xl font-bold tracking-tight outline-none placeholder:text-gray-200" />
             </div>
+            {!esGasto && conFactura && monto > 0 && (
+              <span className="mt-1 block text-sm text-gray-500">
+                + IVA {formatoMoneda(ivaNum)} = <span className="font-semibold text-gray-900">{formatoMoneda(montoFinal)}</span> a cobrar
+              </span>
+            )}
           </label>
 
           {/* Categoría */}
@@ -260,7 +271,7 @@ export default function CapturaMovimiento({ movimiento: m, completo, clientes = 
             <label className="flex cursor-pointer items-center justify-between gap-3">
               <span>
                 <span className="block text-sm font-medium text-gray-900">Con factura</span>
-                <span className="block text-xs text-gray-500">{esGasto ? 'Para que contabilidad lo pueda deducir' : 'Se emitió factura de este ingreso'}</span>
+                <span className="block text-xs text-gray-500">{esGasto ? 'Para que contabilidad lo pueda deducir' : 'Se le suma el IVA al precio'}</span>
               </span>
               <input type="checkbox" checked={conFactura} disabled={soloLectura} onChange={(e) => setConFactura(e.target.checked)}
                 className="peer sr-only" />
@@ -268,7 +279,7 @@ export default function CapturaMovimiento({ movimiento: m, completo, clientes = 
             </label>
             {conFactura && (
               <label className="mt-3 flex items-center gap-3">
-                <span className="text-xs text-gray-500">IVA incluido</span>
+                <span className="text-xs text-gray-500">{esGasto ? 'IVA incluido' : 'IVA a sumar'}</span>
                 <input value={ivaMostrado} onChange={(e) => { setIvaTocado(true); setIvaTexto(e.target.value.replace(/[^\d.,]/g, '')) }}
                   inputMode="decimal" disabled={soloLectura}
                   className="w-32 rounded-lg border border-gray-200 px-2.5 py-1.5 text-right text-sm focus:border-brand-500 focus:outline-none" />
@@ -339,7 +350,7 @@ export default function CapturaMovimiento({ movimiento: m, completo, clientes = 
                 esGasto ? 'bg-brand-600 hover:bg-brand-700' : 'bg-green-600 hover:bg-green-700'}`}>
               {guardando && <Loader2 size={16} className="animate-spin" />}
               {m ? 'Guardar cambios' : esGasto ? 'Guardar gasto' : 'Guardar ingreso'}
-              {monto > 0 && !m && <span className="font-normal opacity-80">· {formatoMoneda(monto)}</span>}
+              {monto > 0 && !m && <span className="font-normal opacity-80">· {formatoMoneda(montoFinal)}</span>}
             </button>
           </div>
         )}

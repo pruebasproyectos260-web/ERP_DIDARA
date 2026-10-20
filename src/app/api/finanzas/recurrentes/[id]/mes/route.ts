@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireNivel } from '@/lib/auth'
 import { errorValidacion, leerJson } from '@/lib/campos'
 import { registrarActividad } from '@/lib/actividad'
-import { esquemaMarcarMes, esquemaMes, formatoMoneda, hoyMexico, ivaIncluido, nombreMes, recurrenteVigente, vencimiento } from '@/lib/finanzas'
+import {
+  esquemaMarcarMes, esquemaMes, formatoMoneda, hoyMexico, ivaIncluido, ivaSobre, nombreMes, recurrenteVigente, redondear, vencimiento,
+} from '@/lib/finanzas'
 import { soloFinanzas, SELECT_MOVIMIENTO } from '@/lib/finanzas-servidor'
 
 // Marcar ✓ un pago/cobro fijo en un mes = registrar el movimiento real de ese mes.
@@ -25,6 +27,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const importe = monto ?? Number(r.monto)
   if (!(importe > 0)) return NextResponse.json({ error: 'Escribe el monto' }, { status: 400 })
   const hoy = hoyMexico()
+  // Pago con factura: el monto ya trae IVA y se extrae. Cobro con factura: el monto es sin IVA y se suma.
+  const sumaIva = r.tipo === 'ingreso' && r.con_factura
+  const iva = !r.con_factura ? null : sumaIva ? ivaSobre(importe) : ivaIncluido(importe)
+  const montoReal = sumaIva ? redondear(importe + (iva ?? 0)) : importe
 
   const { data, error } = await auth.supabase.from('movimientos').insert({
     tipo: r.tipo,
@@ -32,10 +38,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     fecha: fecha ?? (hoy.startsWith(mes) ? hoy : vencimiento(mes, r.dia)),
     categoria: r.categoria,
     descripcion: `${r.nombre} · ${nombreMes(mes)}`,
-    monto: importe,
+    monto: montoReal,
     metodo_pago: metodo_pago ?? r.metodo_pago,
     con_factura: r.con_factura,
-    iva: r.con_factura ? ivaIncluido(importe) : null,
+    iva,
     cliente_id: r.cliente_id,
     recurrente_id: r.id,
     mes_recurrente: mes,
@@ -51,7 +57,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'No se pudo registrar' }, { status: 500 })
   }
   await registrarActividad(auth, 'registrar_pago', 'fin_recurrentes', r.id,
-    `${r.tipo === 'gasto' ? 'Pagó' : 'Cobró'} ${r.nombre} de ${nombreMes(mes)}: ${formatoMoneda(importe)}`)
+    `${r.tipo === 'gasto' ? 'Pagó' : 'Cobró'} ${r.nombre} de ${nombreMes(mes)}: ${formatoMoneda(montoReal)}${iva ? ` (IVA ${formatoMoneda(iva)})` : ''}`)
   return NextResponse.json({ data }, { status: 201 })
 }
 

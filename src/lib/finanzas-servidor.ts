@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { Sesion } from '@/lib/auth'
-import { hoyMexico, rangoMes, recurrenteVigente, redondear, sumarMeses, vencimiento, veFinanzas } from '@/lib/finanzas'
+import {
+  hoyMexico, montoFijoReal, rangoMes, recurrenteVigente, redondear, sumarMeses, TASA_IVA, vencimiento, veFinanzas,
+} from '@/lib/finanzas'
 
 type Supabase = Sesion['supabase']
 
@@ -26,19 +28,50 @@ export interface PorCobrar {
   cliente: string
   fecha: string
   estado: string
-  total: number
-  iva: number
+  /** Importe del documento SIN IVA */
+  base: number
+  /** IVA que se suma si se factura: el de la cotización, o 16 % */
+  tasa_iva: number
+  /** ¿Se cobra con factura? Cotización con IVA o facturada; en reportes se decide al cobrar */
   con_factura: boolean
+  /** Lo abonado sin IVA */
+  cobrado_base: number
+  /** Dinero recibido (IVA incluido) */
   cobrado: number
+  saldo_base: number
+  /** Lo que falta por recibir: con IVA si se factura */
   saldo: number
+  /** Total del documento: con IVA si se factura */
+  total: number
   dias: number
+}
+
+/**
+ * Importe sin IVA de un documento y la tasa que se le suma si se factura.
+ * Cotización con IVA: su total ya trae el IVA (base = total − IVA). Lo demás: el total es sin IVA.
+ */
+export function baseDeDocumento(doc: { total: unknown; estado?: unknown; aplica_iva?: unknown; iva_monto?: unknown }, esCotizacion: boolean) {
+  const total = Number(doc.total ?? 0)
+  if (esCotizacion && doc.aplica_iva) {
+    const base = redondear(total - Number(doc.iva_monto ?? 0))
+    return { base, tasa: base > 0 ? Number(doc.iva_monto ?? 0) / base : TASA_IVA, conFactura: true }
+  }
+  return { base: total, tasa: TASA_IVA, conFactura: esCotizacion && doc.estado === 'facturada' }
+}
+
+/** Lo cobrado de un documento: dinero recibido y su parte sin IVA */
+export function sumarCobrado(pagos: { monto: unknown; iva: unknown }[]) {
+  return {
+    cobrado: redondear(pagos.reduce((a, p) => a + Number(p.monto), 0)),
+    cobradoBase: redondear(pagos.reduce((a, p) => a + Number(p.monto) - Number(p.iva ?? 0), 0)),
+  }
 }
 
 /**
  * Lo que se debe cobrar:
  * - Cotizaciones aceptadas, aprobadas o facturadas (el cliente ya dijo que sí).
  * - Reportes FIRMADOS por el cliente con importe (firmar = autorizar el trabajo y el monto).
- * Menos lo que ya se registró como pagado en Finanzas.
+ * Menos lo que ya se registró como pagado en Finanzas. Más recientes primero.
  */
 export async function cuentasPorCobrar(supabase: Supabase) {
   const [cots, reps, pagos] = await Promise.all([
@@ -48,43 +81,35 @@ export async function cuentasPorCobrar(supabase: Supabase) {
     supabase.from('reportes')
       .select('id, folio, fecha_ingreso, fecha_entrega, firma_fecha, estado, total, cliente_id, cliente:clientes(nombre)')
       .gt('total', 0).not('firma_fecha', 'is', null),
-    supabase.from('movimientos').select('cotizacion_id, reporte_id, monto')
+    supabase.from('movimientos').select('cotizacion_id, reporte_id, monto, iva')
       .eq('tipo', 'ingreso').or('cotizacion_id.not.is.null,reporte_id.not.is.null'),
   ])
   const error = cots.error ?? reps.error ?? pagos.error
   if (error) return { data: [] as PorCobrar[], error }
 
-  const pagadoCot = new Map<number, number>()
-  const pagadoRep = new Map<number, number>()
-  for (const p of pagos.data ?? []) {
-    if (p.cotizacion_id) pagadoCot.set(p.cotizacion_id, (pagadoCot.get(p.cotizacion_id) ?? 0) + Number(p.monto))
-    else if (p.reporte_id) pagadoRep.set(p.reporte_id, (pagadoRep.get(p.reporte_id) ?? 0) + Number(p.monto))
-  }
+  const pagosDe = (campo: 'cotizacion_id' | 'reporte_id', id: number) => (pagos.data ?? []).filter((p) => p[campo] === id)
   const hoy = Date.now()
   const dias = (f: string) => Math.max(0, Math.floor((hoy - new Date(`${f}T12:00:00`).getTime()) / 86_400_000))
 
+  const armar = (origen: 'cotizacion' | 'reporte', doc: Record<string, unknown> & { total: unknown }, fecha: string): PorCobrar => {
+    const { base, tasa, conFactura } = baseDeDocumento(doc, origen === 'cotizacion')
+    const { cobrado, cobradoBase } = sumarCobrado(pagosDe(origen === 'cotizacion' ? 'cotizacion_id' : 'reporte_id', doc.id as number))
+    const saldoBase = redondear(base - cobradoBase)
+    const conIva = (n: number) => (conFactura ? redondear(n * (1 + tasa)) : n)
+    return {
+      origen, id: doc.id as number, folio: doc.folio as string, cliente_id: doc.cliente_id as number | null,
+      cliente: unir<{ nombre: string }>(doc.cliente)?.nombre ?? 'Sin cliente',
+      fecha, estado: doc.estado as string,
+      base, tasa_iva: tasa, con_factura: conFactura,
+      cobrado_base: cobradoBase, cobrado, saldo_base: saldoBase,
+      saldo: conIva(saldoBase), total: conIva(base), dias: dias(fecha),
+    }
+  }
+
   const items: PorCobrar[] = [
-    ...(cots.data ?? []).map((c) => {
-      const cobrado = redondear(pagadoCot.get(c.id) ?? 0)
-      return {
-        origen: 'cotizacion' as const, id: c.id, folio: c.folio, cliente_id: c.cliente_id,
-        cliente: unir<{ nombre: string }>(c.cliente)?.nombre ?? 'Sin cliente',
-        fecha: c.fecha, estado: c.estado, total: Number(c.total),
-        iva: c.aplica_iva ? Number(c.iva_monto ?? 0) : 0, con_factura: !!c.aplica_iva || c.estado === 'facturada',
-        cobrado, saldo: redondear(Number(c.total) - cobrado), dias: dias(c.fecha),
-      }
-    }),
-    ...(reps.data ?? []).map((r) => {
-      const cobrado = redondear(pagadoRep.get(r.id) ?? 0)
-      const fecha = (r.firma_fecha as string | null)?.slice(0, 10) ?? r.fecha_entrega ?? r.fecha_ingreso
-      return {
-        origen: 'reporte' as const, id: r.id, folio: r.folio, cliente_id: r.cliente_id,
-        cliente: unir<{ nombre: string }>(r.cliente)?.nombre ?? 'Sin cliente',
-        fecha, estado: r.estado, total: Number(r.total), iva: 0, con_factura: false,
-        cobrado, saldo: redondear(Number(r.total) - cobrado), dias: dias(fecha),
-      }
-    }),
-  ].filter((i) => i.saldo > 0.009).sort((a, b) => a.fecha.localeCompare(b.fecha))
+    ...(cots.data ?? []).map((c) => armar('cotizacion', c, c.fecha)),
+    ...(reps.data ?? []).map((r) => armar('reporte', r, (r.firma_fecha as string | null)?.slice(0, 10) ?? r.fecha_entrega ?? r.fecha_ingreso)),
+  ].filter((i) => i.saldo_base > 0.009).sort((a, b) => b.fecha.localeCompare(a.fecha))
 
   return { data: items, error: null }
 }
@@ -171,7 +196,8 @@ export async function resumenMes(supabase: Supabase, mes: string) {
     const pendientes = lista.filter((f) => !f.hecho)
     return {
       total: lista.length, hechos: lista.length - pendientes.length,
-      montoPendiente: redondear(pendientes.reduce((a, f) => a + Number(f.monto), 0)),
+      // Cobros con factura: el cliente paga el monto + IVA
+      montoPendiente: redondear(pendientes.reduce((a, f) => a + montoFijoReal(f), 0)),
       vencidos: pendientes.filter((f) => f.vence < hoyMexico()).length,
     }
   }

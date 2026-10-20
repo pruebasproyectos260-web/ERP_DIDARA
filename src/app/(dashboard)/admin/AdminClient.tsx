@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { History, Pencil, Plus, Settings, Trash2, Users } from 'lucide-react'
 import type { Usuario, Configuracion } from '@/types'
 import ActividadPanel from './ActividadPanel'
+import DispositivosAvisos from './DispositivosAvisos'
 import { aviso, confirmar } from '@/components/ui/Avisos'
 import { BotonIcono, BotonPrincipal, EncabezadoPagina } from '@/components/ui/Pagina'
 
@@ -287,6 +288,8 @@ export default function AdminClient({ usuarios: inicial, config: configInicial }
               </tbody>
             </table>
           </div>
+
+          <DispositivosAvisos />
         </div>
       )}
 

@@ -98,8 +98,24 @@ export function vencimiento(mes: string, dia: number | null) {
 }
 
 export const redondear = (n: number) => Math.round(n * 100) / 100
-/** IVA contenido en un total que ya lo incluye (16 %) */
-export const ivaIncluido = (total: number, tasa = 0.16) => redondear(total - total / (1 + tasa))
+
+// ── IVA (regla acordada con Didara) ──────────────────────────────────────
+// PAGOS (gastos): el monto que se captura es lo que se pagó, IVA incluido.
+//   Con factura, el IVA se EXTRAE de ese monto para contabilidad.
+// COBROS (ingresos): el precio se captura SIN IVA.
+//   Con factura, el IVA se SUMA: el cliente paga precio + IVA y ese IVA va a contabilidad.
+// En movimientos, "monto" siempre es el dinero que realmente entró o salió (IVA incluido)
+// e "iva" es la parte de IVA; el subtotal es monto − iva.
+
+export const TASA_IVA = 0.16
+/** IVA contenido en un total que ya lo incluye (pagos) */
+export const ivaIncluido = (total: number, tasa = TASA_IVA) => redondear(total - total / (1 + tasa))
+/** IVA que se suma a un precio sin IVA (cobros) */
+export const ivaSobre = (base: number, tasa = TASA_IVA) => redondear(base * tasa)
+
+/** Lo que realmente entra o sale por un pago/cobro fijo: a los cobros con factura se les suma el IVA */
+export const montoFijoReal = (f: { tipo: string; monto: unknown; con_factura: boolean }) =>
+  f.tipo === 'ingreso' && f.con_factura ? redondear(Number(f.monto) + ivaSobre(Number(f.monto))) : Number(f.monto)
 
 export const formatoMoneda = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
@@ -167,6 +183,7 @@ export const esquemaMarcarMes = z.object({
 export const esquemaPago = z.object({
   origen: z.enum(['cotizacion', 'reporte']),
   id: z.number().int().positive(),
+  /** Importe que se abona, SIN IVA (con factura el servidor le suma el IVA) */
   monto: dinero.optional(),
   fecha: fecha.optional(),
   metodo_pago: metodo,
