@@ -50,8 +50,16 @@ export function nombreCliente(t: { cliente_nombre: string | null; cliente?: { no
 }
 
 // ── Avisos al equipo (correo + push) ─────────────────────────────────────
+// Regla: un ticket SIN asignar es de todos (push a todo el equipo); en cuanto se asigna,
+// sus avisos le llegan SOLO a la persona asignada. Los correos de ticket nuevo van a dirección.
 
-/** Dirección y administradores (niveles 0 y 1): reciben los tickets nuevos del portal */
+/** Todo el equipo activo (push de tickets sin asignar), opcionalmente sin quien hizo la acción */
+async function todoElEquipo(supabase: Supabase, excepto?: string | null) {
+  const { data } = await supabase.from('usuarios').select('id').eq('activo', true)
+  return (data ?? []).map((u) => u.id as string).filter((id) => id !== excepto)
+}
+
+/** Dirección y administradores (niveles 0 y 1): reciben el correo de los tickets nuevos del portal */
 async function equipoDireccion(supabase: Supabase) {
   const { data } = await supabase.from('usuarios').select('id, correo').eq('activo', true).lte('nivel', 1)
   return {
@@ -80,7 +88,7 @@ function datosTicketHtml(t: TicketFila) {
 /** Aviso al equipo de un ticket nuevo levantado desde el portal */
 export async function avisarTicketNuevo(supabase: Supabase, req: Request, t: TicketFila, cliente: string) {
   try {
-    const { ids, correos } = await equipoDireccion(supabase)
+    const [{ correos }, ids] = await Promise.all([equipoDireccion(supabase), todoElEquipo(supabase)])
     const urgente = t.prioridad === 'urgente'
     const contenido = `
       <p style="margin:0 0 14px;color:#374151;"><strong>${escaparHtml(cliente)}</strong> levantó un ticket desde el portal de soporte${urgente ? ' marcado como <strong style="color:#dc2626;">URGENTE</strong>' : ''}.</p>
@@ -104,6 +112,21 @@ export async function avisarTicketNuevo(supabase: Supabase, req: Request, t: Tic
   } catch {
     // El aviso no debe impedir que el ticket se registre
   }
+}
+
+/** Ticket registrado por el equipo (WhatsApp, teléfono…) sin asignar: push a todos menos a quien lo registró */
+export async function avisarTicketRegistrado(supabase: Supabase, t: TicketFila, cliente: string, registradoPor: string) {
+  if (t.asignado_a) return // asignado: solo se avisa a esa persona (avisarAsignacion)
+  try {
+    const urgente = t.prioridad === 'urgente'
+    await enviarPush(supabase, await todoElEquipo(supabase, registradoPor), {
+      titulo: `${urgente ? '🔴 ' : ''}Nuevo ticket ${t.folio} · ${cliente}`,
+      cuerpo: `${t.asunto} (sin asignar)`,
+      url: `/tickets?ver=${t.id}`,
+      etiqueta: `ticket-${t.id}`,
+      urgente,
+    })
+  } catch { /* silencioso */ }
 }
 
 /** Aviso al técnico cuando le asignan un ticket (si no se lo asignó él mismo) */
@@ -135,13 +158,16 @@ export async function avisarAsignacion(supabase: Supabase, req: Request, t: Tick
   } catch { /* silencioso */ }
 }
 
-/** Aviso cuando el cliente responde desde el portal: al técnico asignado o, si nadie lo tiene, a dirección */
+/**
+ * Aviso cuando el cliente responde desde el portal.
+ * Asignado: solo al técnico (correo + push). Sin asignar: push a todo el equipo y correo a dirección.
+ */
 export async function avisarRespuestaCliente(supabase: Supabase, req: Request, t: TicketFila, cliente: string, autor: string, mensaje: string, reabierto: boolean) {
   try {
     const tecnico = t.asignado_a ? await usuarioActivo(supabase, t.asignado_a) : null
     const destino = tecnico
       ? { ids: [tecnico.id], correos: tecnico.correo?.includes('@') ? [tecnico.correo] : [] }
-      : await equipoDireccion(supabase)
+      : { ids: await todoElEquipo(supabase), correos: (await equipoDireccion(supabase)).correos }
     const contenido = `
       <p style="margin:0 0 14px;color:#374151;"><strong>${escaparHtml(autor)}</strong> (${escaparHtml(cliente)}) respondió en el ticket <strong>${escaparHtml(t.folio)}</strong> — “${escaparHtml(t.asunto)}”${reabierto ? '. El ticket estaba resuelto y <strong>se reabrió</strong>' : ''}.</p>
       <p style="margin:0;padding:12px 14px;background:#f8fafc;border-left:3px solid #187d78;border-radius:8px;color:#374151;font-size:.9rem;">${escaparMultilinea(mensaje)}</p>

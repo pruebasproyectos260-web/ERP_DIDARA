@@ -20,13 +20,13 @@ export async function GET(req: NextRequest) {
   const [activos, nuevos, respuestas] = await Promise.all([
     supabase.from('tickets').select('id', { count: 'exact', head: true }).not('estado', 'in', '("resuelto","cerrado")'),
     // Tickets nuevos que no registró uno mismo
-    supabase.from('tickets').select('id, folio, asunto, prioridad, cliente_nombre, cliente:clientes(nombre)')
+    supabase.from('tickets').select('id, folio, asunto, prioridad, asignado_a, cliente_nombre, cliente:clientes(nombre)')
       .gt('created_at', desde).or(`creado_por.is.null,creado_por.neq.${userId}`)
-      .order('created_at').limit(10),
+      .order('created_at').limit(20),
     // Mensajes de clientes desde el portal
-    supabase.from('ticket_comentarios').select('id, ticket_id, autor_nombre, mensaje, ticket:tickets(folio)')
+    supabase.from('ticket_comentarios').select('id, ticket_id, autor_nombre, mensaje, ticket:tickets(folio, asignado_a)')
       .gt('created_at', desde).is('autor_id', null).eq('es_sistema', false)
-      .order('created_at').limit(10),
+      .order('created_at').limit(20),
   ])
   if (activos.error) {
     if (faltaMigracion(activos.error)) return NextResponse.json({ data: { ahora: new Date(ahora).toISOString(), activos: 0, eventos: [] } })
@@ -35,12 +35,14 @@ export async function GET(req: NextRequest) {
 
   // Las relaciones embebidas pueden venir como objeto o como arreglo de uno
   const unir = (v: unknown) => (Array.isArray(v) ? v[0] : v) as Record<string, string> | null | undefined
+  // Ticket sin asignar = de todos; asignado = solo de esa persona
+  const meToca = (asignado: unknown) => !asignado || asignado === userId
   const eventos = [
-    ...(nuevos.data ?? []).map((t) => ({
+    ...(nuevos.data ?? []).filter((t) => meToca(t.asignado_a)).map((t) => ({
       clave: `t${t.id}`, tipo: 'nuevo' as const, ticketId: t.id, folio: t.folio, urgente: t.prioridad === 'urgente',
       texto: `${t.asunto} · ${unir(t.cliente)?.nombre ?? t.cliente_nombre ?? 'Cliente'}`,
     })),
-    ...(respuestas.data ?? []).map((c) => ({
+    ...(respuestas.data ?? []).filter((c) => meToca(unir(c.ticket)?.asignado_a)).map((c) => ({
       clave: `c${c.id}`, tipo: 'respuesta' as const, ticketId: c.ticket_id, folio: unir(c.ticket)?.folio ?? '', urgente: false,
       texto: `${c.autor_nombre}: ${c.mensaje.length > 90 ? `${c.mensaje.slice(0, 90)}…` : c.mensaje}`,
     })),

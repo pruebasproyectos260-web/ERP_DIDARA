@@ -1,19 +1,21 @@
 'use client'
 
 import { useState } from 'react'
-import { CalendarCheck, HandCoins, LayoutGrid, ListOrdered } from 'lucide-react'
+import { Calculator, CalendarCheck, HandCoins, LayoutGrid, ListOrdered } from 'lucide-react'
 import { EncabezadoPagina } from '@/components/ui/Pagina'
 import { mesActual } from '@/lib/finanzas'
 import Resumen, { type Vista } from '@/components/finanzas/Resumen'
 import Movimientos from '@/components/finanzas/Movimientos'
 import Fijos from '@/components/finanzas/Fijos'
 import Cobranza from '@/components/finanzas/Cobranza'
+import Contabilidad from '@/components/finanzas/Contabilidad'
 
 const PESTANAS: { vista: Vista; label: string; icono: React.ComponentType<{ size?: number }> }[] = [
   { vista: 'resumen', label: 'Resumen', icono: LayoutGrid },
   { vista: 'movimientos', label: 'Movimientos', icono: ListOrdered },
   { vista: 'fijos', label: 'Fijos del mes', icono: CalendarCheck },
   { vista: 'cobranza', label: 'Cobranza', icono: HandCoins },
+  { vista: 'contabilidad', label: 'Contabilidad', icono: Calculator },
 ]
 
 export default function FinanzasClient({ completo, clientes, vistaInicial }: {
@@ -64,6 +66,7 @@ export default function FinanzasClient({ completo, clientes, vistaInicial }: {
       )}
       {vista === 'fijos' && <Fijos mes={mes} onMes={setMes} clientes={clientes} />}
       {vista === 'cobranza' && <Cobranza />}
+      {vista === 'contabilidad' && <Contabilidad mes={mes} onMes={setMes} />}
     </div>
   )
 }

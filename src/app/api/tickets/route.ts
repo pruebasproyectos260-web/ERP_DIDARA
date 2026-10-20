@@ -4,7 +4,7 @@ import { NIVEL } from '@/lib/nivel'
 import { errorValidacion, leerJson } from '@/lib/campos'
 import { registrarActividad } from '@/lib/actividad'
 import { ETIQUETA_ORIGEN, esquemaTicketInterno, faltaMigracion } from '@/lib/tickets'
-import { avisarAsignacion, comentarioSistema, crearTicket, nombreCliente, type TicketFila } from '@/lib/tickets-servidor'
+import { avisarAsignacion, avisarTicketRegistrado, comentarioSistema, crearTicket, nombreCliente, type TicketFila } from '@/lib/tickets-servidor'
 
 export async function GET() {
   const auth = await requireNivel()
@@ -50,6 +50,10 @@ export async function POST(req: NextRequest) {
   await registrarActividad(auth, 'crear', 'tickets', ticket.id, `${ticket.folio} ${ticket.asunto}`)
 
   const { data: completo } = await supabase.from('tickets').select('*, cliente:clientes(id, nombre)').eq('id', ticket.id).single()
-  if (completo) await avisarAsignacion(supabase, req, completo as TicketFila, nombreCliente(completo), auth)
+  if (completo) {
+    // Asignado: solo a esa persona. Sin asignar: a todo el equipo
+    await avisarAsignacion(supabase, req, completo as TicketFila, nombreCliente(completo), auth)
+    await avisarTicketRegistrado(supabase, completo as TicketFila, nombreCliente(completo), auth.userId)
+  }
   return NextResponse.json({ data: completo }, { status: 201 })
 }

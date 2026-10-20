@@ -11,7 +11,8 @@ interface OpcionesCorreo {
 export async function enviarCorreo({ para, cc, asunto, html, adjuntos }: OpcionesCorreo) {
   // Pruebas locales: no enviar correos reales (nunca se define en producción)
   if (process.env.CORREO_DESACTIVADO === '1') {
-    console.log(`[correo desactivado] "${asunto}" → ${[para].flat().join(', ')}`)
+    console.log(`[correo desactivado] "${asunto}" → ${[para].flat().join(', ')}${cc ? ` (cc ${[cc].flat().join(', ')})` : ''}` +
+      (adjuntos?.length ? ` · adjuntos: ${adjuntos.map((a) => `${a.filename} ${Math.round(a.content.length / 1024)} KB`).join(', ')}` : ''))
     return
   }
 

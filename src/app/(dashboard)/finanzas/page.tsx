@@ -6,7 +6,7 @@ import FinanzasClient from './FinanzasClient'
 export const metadata: Metadata = { title: 'Finanzas' }
 export const dynamic = 'force-dynamic'
 
-const VISTAS = ['resumen', 'movimientos', 'fijos', 'cobranza'] as const
+const VISTAS = ['resumen', 'movimientos', 'fijos', 'cobranza', 'contabilidad'] as const
 
 export default async function FinanzasPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
   const { vista } = await searchParams

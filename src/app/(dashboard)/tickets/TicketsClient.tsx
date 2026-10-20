@@ -166,7 +166,7 @@ export default function TicketsClient({ ticketsIniciales, usuarios, clientes, ni
           <BotonIcono titulo="Actualizar" onClick={recargarLista} className="border border-gray-200 bg-white !p-2.5">
             <RefreshCw size={16} />
           </BotonIcono>
-          <BotonAvisos />
+          <BotonAvisos nombre={nombreUsuario[userId]} />
           {puedeEditar && (
             <BotonPrincipal onClick={() => setNuevo(true)}>
               <Plus size={17} /> <span>Nuevo ticket</span>

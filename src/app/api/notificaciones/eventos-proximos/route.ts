@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireNivel } from '@/lib/auth'
-import { esEncargado } from '@/lib/agenda'
+import { ahoraMexico, diaISO, esEncargado } from '@/lib/agenda'
 
 /**
  * Eventos de los próximos 7 días donde el usuario en sesión es ENCARGADO.
@@ -12,11 +12,11 @@ export async function GET() {
   if (auth instanceof NextResponse) return auth
   const { supabase } = auth
 
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
-  const desde = hoy.toISOString().slice(0, 10)
-  const hasta = new Date(hoy.getTime() + 7 * 24 * 60 * 60 * 1000)
-  const hastaStr = hasta.toISOString().slice(0, 10) + 'T23:59:59'
+  // Las horas de la agenda son "de pared" (hora de México, ver lib/agenda.ts)
+  const ahora = ahoraMexico()
+  const desde = ahora.slice(0, 10)
+  const [a, m, d] = desde.split('-').map(Number)
+  const hastaStr = `${diaISO(new Date(a, m - 1, d + 7))}T23:59:59`
 
   const { data, error } = await supabase
     .from('eventos')

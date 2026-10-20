@@ -26,7 +26,7 @@ interface Datos {
   porRevisar: number
 }
 
-export type Vista = 'resumen' | 'movimientos' | 'fijos' | 'cobranza'
+export type Vista = 'resumen' | 'movimientos' | 'fijos' | 'cobranza' | 'contabilidad'
 
 const corto = (n: number) => (Math.abs(n) >= 1000 ? `$${(n / 1000).toFixed(Math.abs(n) >= 10000 ? 0 : 1)}k` : `$${Math.round(n)}`)
 

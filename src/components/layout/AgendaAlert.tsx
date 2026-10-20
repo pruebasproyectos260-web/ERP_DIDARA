@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { X, Calendar } from 'lucide-react'
+import { fechaEvento } from '@/lib/agenda'
 
 interface EventoProximo {
   id: number
@@ -56,15 +57,12 @@ export default function AgendaAlert({ userId }: { userId: string }) {
           <p className="text-sm text-gray-500">Tienes los siguientes eventos asignados en los próximos 7 días:</p>
           <div className="space-y-2">
             {eventos.map((ev) => {
-              const fecha = new Date(
-                ev.fecha_inicio.length === 10
-                  ? ev.fecha_inicio + 'T00:00:00'
-                  : ev.fecha_inicio
-              )
+              const fecha = fechaEvento(ev.fecha_inicio)
+              const dia = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate())
               const hoy = new Date()
               hoy.setHours(0, 0, 0, 0)
               const diasRestantes = Math.round(
-                (fecha.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)
+                (dia.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)
               )
               return (
                 <div

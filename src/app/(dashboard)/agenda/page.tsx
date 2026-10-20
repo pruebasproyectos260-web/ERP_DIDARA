@@ -7,7 +7,7 @@ import { borrar } from '@/lib/api-cliente'
 import { BotonIcono, BotonPrincipal, EncabezadoPagina } from '@/components/ui/Pagina'
 import type { Evento, Cliente, Usuario } from '@/types'
 import { aviso, confirmar } from '@/components/ui/Avisos'
-import { esEncargado } from '@/lib/agenda'
+import { diaISO, esEncargado, fechaEvento } from '@/lib/agenda'
 
 const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
@@ -61,11 +61,14 @@ function diaSemana(fecha: Date) {
 
 function formatHora(iso: string) {
   try {
-    return new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+    return fechaEvento(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
   } catch {
     return ''
   }
 }
+
+/** Rango de un mes para consultar eventos (hora de pared, ver lib/agenda.ts) */
+const rangoConsulta = (m: Date) => ({ desde: `${diaISO(primerDiaMes(m))}T00:00:00`, hasta: `${diaISO(ultimoDiaMes(m))}T23:59:59` })
 
 const FORM_VACIO = {
   titulo: '',
@@ -108,8 +111,7 @@ export default function AgendaPage() {
   // Eventos del mes visible: se piden al cambiar de mes (el "cargando" se activa en cambiarMes)
   useEffect(() => {
     let cancelado = false
-    const desde = primerDiaMes(mes).toISOString()
-    const hasta = ultimoDiaMes(mes).toISOString()
+    const { desde, hasta } = rangoConsulta(mes)
     fetch(`/api/agenda?desde=${desde}&hasta=${hasta}`)
       .then(r => r.json())
       .then(json => { if (!cancelado) setEventos(json.data ?? []) })
@@ -157,7 +159,7 @@ export default function AgendaPage() {
     const ahora = new Date()
     const en3Dias = new Date(ahora.getTime() + 3 * 24 * 60 * 60 * 1000)
     return eventos.filter(ev => {
-      const f = new Date(ev.fecha_inicio)
+      const f = fechaEvento(ev.fecha_inicio)
       return f >= ahora && f <= en3Dias && esEncargado(ev.responsables, usuarioActual.nombre)
     })
   }, [usuarioActual, eventos])
@@ -182,12 +184,12 @@ export default function AgendaPage() {
 
   // Eventos del día seleccionado
   const eventosDia = eventos
-    .filter(ev => mismaFecha(new Date(ev.fecha_inicio), diaSeleccionado))
-    .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime())
+    .filter(ev => mismaFecha(fechaEvento(ev.fecha_inicio), diaSeleccionado))
+    .sort((a, b) => fechaEvento(a.fecha_inicio).getTime() - fechaEvento(b.fecha_inicio).getTime())
 
   function abrirNuevo() {
     setEditando(null)
-    const fechaStr = diaSeleccionado.toISOString().slice(0, 10)
+    const fechaStr = diaISO(diaSeleccionado)
     setForm({ ...FORM_VACIO, fecha: fechaStr })
     setResponsablesSeleccionados([])
     setModal(true)
@@ -195,13 +197,13 @@ export default function AgendaPage() {
 
   function abrirEditar(ev: Evento) {
     setEditando(ev)
-    const f = new Date(ev.fecha_inicio)
+    const f = fechaEvento(ev.fecha_inicio)
     setForm({
       titulo: ev.titulo,
       tipo: ev.tipo,
-      fecha: f.toISOString().slice(0, 10),
+      fecha: diaISO(f),
       hora_inicio: f.toTimeString().slice(0, 5),
-      hora_fin: ev.fecha_fin ? new Date(ev.fecha_fin).toTimeString().slice(0, 5) : '10:00',
+      hora_fin: ev.fecha_fin ? fechaEvento(ev.fecha_fin).toTimeString().slice(0, 5) : '10:00',
       todo_el_dia: ev.todo_el_dia,
       cliente_id: ev.cliente_id?.toString() ?? '',
       lugar: ev.lugar ?? '',
@@ -267,8 +269,7 @@ export default function AgendaPage() {
   async function limpiarMesAnterior() {
     if (!(await confirmar({ titulo: '¿Eliminar todos los eventos del mes anterior?', mensaje: 'Esta acción no se puede deshacer.', peligro: true }))) return
     const mesPasado = new Date(mes.getFullYear(), mes.getMonth() - 1, 1)
-    const desde = primerDiaMes(mesPasado).toISOString()
-    const hasta = ultimoDiaMes(mesPasado).toISOString()
+    const { desde, hasta } = rangoConsulta(mesPasado)
     const res = await fetch(`/api/agenda?desde=${desde}&hasta=${hasta}`)
     const json = await res.json()
     const eventosPasados: Evento[] = json.data ?? []
@@ -343,7 +344,7 @@ export default function AgendaPage() {
               const esHoy = mismaFecha(dia, hoy)
               const esSeleccionado = mismaFecha(dia, diaSeleccionado)
               const esPasado = dia < hoyNorm
-              const eventosDelDia = eventos.filter(ev => mismaFecha(new Date(ev.fecha_inicio), dia))
+              const eventosDelDia = eventos.filter(ev => mismaFecha(fechaEvento(ev.fecha_inicio), dia))
               return (
                 <button
                   key={dia.toISOString()}
@@ -648,7 +649,7 @@ export default function AgendaPage() {
               <p className="text-sm text-gray-500">Tienes {eventosProximos.length} evento{eventosProximos.length > 1 ? 's' : ''} en los próximos 3 días:</p>
               <div className="divide-y divide-gray-100">
                 {eventosProximos.map(ev => {
-                  const f = new Date(ev.fecha_inicio)
+                  const f = fechaEvento(ev.fecha_inicio)
                   const tipoInfo = TIPOS_EVENTO.find(t => t.valor === ev.tipo)
                   return (
                     <div key={ev.id} className="py-3 flex items-start gap-3">

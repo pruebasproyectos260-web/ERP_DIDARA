@@ -6,7 +6,7 @@ import { aviso, confirmar } from '@/components/ui/Avisos'
 import { activarAvisos, desactivarAvisos, estadoAvisos, type EstadoAvisos } from '@/lib/push-cliente'
 
 /** Activa los avisos push (notificaciones del sistema) en el dispositivo actual */
-export default function BotonAvisos() {
+export default function BotonAvisos({ nombre }: { /** Usuario en sesión: los avisos de este dispositivo serán suyos */ nombre?: string }) {
   const [estado, setEstado] = useState<EstadoAvisos>('cargando')
   const [ocupado, setOcupado] = useState(false)
   const [menu, setMenu] = useState(false)
@@ -91,12 +91,17 @@ export default function BotonAvisos() {
   return (
     <div className="relative" ref={menuRef}>
       <button onClick={() => setMenu((v) => !v)} aria-expanded={menu} aria-haspopup="menu"
-        className={`${base} border-gray-200 bg-white text-brand-700 hover:bg-gray-50`} title="Avisos activos en este dispositivo">
+        className={`${base} border-gray-200 bg-white text-brand-700 hover:bg-gray-50`}
+        title={nombre ? `Este dispositivo recibe los avisos de ${nombre.trim()}` : 'Avisos activos en este dispositivo'}>
         <BellRing size={16} /><span className="hidden sm:inline">Avisos activos</span>
       </button>
       {menu && (
-        <div role="menu" className="absolute right-0 z-40 mt-2 w-60 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg animate-aparecer">
-          <p className="px-3.5 py-2 text-xs text-gray-500">Recibes las notificaciones de la mesa de ayuda en este dispositivo.</p>
+        <div role="menu" className="absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg animate-aparecer">
+          <p className="px-3.5 py-2 text-xs text-gray-500">
+            {nombre
+              ? <>Este dispositivo recibe los avisos de <span className="font-semibold text-gray-800">{nombre.trim()}</span>. Si no eres tú, cierra la sesión.</>
+              : 'Recibes las notificaciones en este dispositivo.'}
+          </p>
           <button role="menuitem" onClick={probar} className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">
             <Send size={15} className="text-brand-600" /> Enviar aviso de prueba
           </button>
