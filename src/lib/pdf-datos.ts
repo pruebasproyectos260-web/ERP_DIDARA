@@ -9,7 +9,8 @@ type Fila = Record<string, unknown>
 
 const texto = (v: unknown) => (v === null || v === undefined ? '' : String(v))
 const opcional = (v: unknown) => (v === null || v === undefined || v === '' ? undefined : String(v))
-const dinero = (v: unknown) => `$${Number(v ?? 0).toFixed(2)}`
+const formatoPesos = new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const dinero = (v: unknown) => `$${formatoPesos.format(Number(v ?? 0))}`
 
 export function fmtFechaPDF(d: unknown): string {
   if (!d) return ''
@@ -89,6 +90,7 @@ export function datosPDFReporte(
 ): DatosReportePDF {
   const cliente = reporte.cliente as Fila | null
   const rawItems: Fila[] = Array.isArray(reporte.items) ? reporte.items as Fila[] : []
+  const sumaMateriales = rawItems.reduce((a, item) => a + Number(item.subtotal ?? 0), 0)
 
   return {
     folio: texto(reporte.folio),
@@ -115,8 +117,10 @@ export function datosPDFReporte(
       precio_unitario: dinero(item.precio_unitario),
       subtotal: dinero(item.subtotal),
     })),
+    materiales_total: sumaMateriales > 0 ? dinero(sumaMateriales) : undefined,
     subtotal: dinero(reporte.subtotal),
     total: dinero(reporte.total),
+    total_numero: Number(reporte.total ?? 0),
     firma_cliente: opcional(reporte.firma_cliente),
     firma_fecha: opcional(reporte.firma_fecha),
     firma_url: reporte.firma_fecha ? undefined : firmaUrl,

@@ -43,8 +43,12 @@ export interface DatosReportePDF {
   observaciones?: string
   evidencias?: EvidenciaPDF[]
   items: ItemPDFReporte[]
+  /** Suma de los materiales (solo si hay materiales con costo) */
+  materiales_total?: string
   subtotal: string
+  /** Costo total del servicio (sección ⑦ del reporte); se captura aparte de los materiales */
   total: string
+  total_numero: number
   firma_cliente?: string
   firma_fecha?: string
   /** Enlace público para que el cliente firme (solo si aún no ha firmado) */
@@ -99,12 +103,23 @@ function htmlReporte(d: DatosReportePDF, logoSrc: string): string {
         </thead>
         <tbody>${filasItems}</tbody>
       </table>
+      ${d.materiales_total ? `
       <div class="totals-wrap">
         <table class="totals">
-          <tr class="total-row"><td>TOTAL:</td><td class="right">${e(d.total)}</td></tr>
+          <tr><td>Total materiales:</td><td class="right">${e(d.materiales_total)}</td></tr>
         </table>
-      </div>`
+      </div>` : ''}`
     : '<p style="color:#aaa;font-size:10px;padding:6px 4px;font-style:italic">No se utilizaron materiales.</p>'
+
+  // El costo del servicio se captura aparte de los materiales: se muestra siempre que tenga importe
+  const costoHtml = d.total_numero > 0
+    ? `<div class="section">
+        <div class="section-title">Costo del Servicio</div>
+        <div class="costo-wrap">
+          <div class="costo-box"><span>COSTO TOTAL</span><span class="costo-monto">${e(d.total)}</span></div>
+        </div>
+      </div>`
+    : ''
 
   // Evidencias fotográficas
   const evidenciasHtml = (() => {
@@ -209,6 +224,13 @@ function htmlReporte(d: DatosReportePDF, logoSrc: string): string {
   .totals { width: 180px; border-collapse: collapse; }
   .totals td { padding: 3px 8px; font-size: 10.5px; }
   .totals .total-row td { border-top: 1px solid #aaa; font-weight: bold; font-size: 13px; padding-top: 5px; }
+  .costo-wrap { display: flex; justify-content: flex-end; }
+  .costo-box {
+    display: flex; align-items: baseline; gap: 18px; padding: 7px 14px;
+    border: 1px solid #b7d7d3; border-radius: 6px; background: #f0f8f7;
+  }
+  .costo-box span:first-child { font-size: 10px; font-weight: bold; color: #1a7a6e; letter-spacing: .04em; }
+  .costo-monto { font-size: 15px; font-weight: bold; color: #111; }
 
   /* ── Evidencias ── */
   .ev-group { margin-bottom: 10px; }
@@ -292,6 +314,8 @@ function htmlReporte(d: DatosReportePDF, logoSrc: string): string {
     <div class="section-title">Materiales y Repuestos</div>
     ${materialesHtml}
   </div>
+
+  ${costoHtml}
 
   ${d.observaciones ? `
   <!-- Observaciones -->
