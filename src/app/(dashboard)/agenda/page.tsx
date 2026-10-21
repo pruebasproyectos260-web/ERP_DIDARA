@@ -139,18 +139,16 @@ export default function AgendaPage() {
       .then(r => r.json())
       .then(j => setClientes(j.data ?? []))
 
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
-      fetch('/api/admin/usuarios')
-        .then(r => r.json())
-        .then(j => {
-          const lista: Usuario[] = j.data ?? []
-          setUsuarios(lista)
-          const yo = lista.find(u => u.id === user.id)
-          if (yo) setUsuarioActual(yo)
-        })
-    })
+    // Quién soy (se lee del token, sin ir al servidor de sesiones) y la lista de usuarios, en paralelo
+    Promise.all([
+      createClient().auth.getClaims(),
+      fetch('/api/admin/usuarios').then(r => r.json()),
+    ]).then(([{ data }, j]) => {
+      const lista: Usuario[] = j.data ?? []
+      setUsuarios(lista)
+      const yo = lista.find(u => u.id === data?.claims?.sub)
+      if (yo) setUsuarioActual(yo)
+    }).catch(() => {})
   }, [])
 
   // Eventos del usuario en los próximos 3 días (se muestran una vez al entrar)

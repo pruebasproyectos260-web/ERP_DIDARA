@@ -4,14 +4,14 @@ import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { LogOut, ChevronDown, Moon, Sun, KeyRound, Menu } from 'lucide-react'
-import type { User as SupabaseUser } from '@supabase/supabase-js'
+import type { UsuarioSesion } from '@/lib/supabase/server'
 import CambiarContrasenaModal from './CambiarContrasenaModal'
 import { itemActivo } from './navegacion'
 import { alternarTema, useTemaOscuro } from '@/lib/tema'
 import { olvidarDispositivo } from '@/lib/push-cliente'
 
 interface Props {
-  user: SupabaseUser
+  user: UsuarioSesion
   perfil: { nombre: string; nivel: number } | null
   esContador?: boolean
   onAbrirMenu: () => void

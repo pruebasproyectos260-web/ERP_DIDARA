@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient, usuarioDeSesion } from '@/lib/supabase/server'
 import { NIVEL } from '@/lib/nivel'
 
 export interface Sesion {
@@ -21,8 +21,7 @@ export interface Sesion {
  *   if (auth instanceof NextResponse) return auth
  */
 export async function requireNivel(nivelMaximo: number = NIVEL.RESTRINGIDO): Promise<Sesion | NextResponse> {
-  const authClient = await createClient()
-  const { data: { user } } = await authClient.auth.getUser()
+  const user = await usuarioDeSesion(await createClient())
   if (!user) return NextResponse.json({ error: 'Tu sesión se cerró. Vuelve a iniciar sesión.' }, { status: 401 })
 
   const supabase = createServiceClient()

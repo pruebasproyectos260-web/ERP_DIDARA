@@ -1,17 +1,18 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, usuarioDeSesion } from '@/lib/supabase/server'
 import { NIVEL } from '@/lib/nivel'
 import { ocultarCostosCotizacion, ocultarCostosProducto } from '@/lib/campos'
 import CotizacionesClient from './CotizacionesClient'
 
 export default async function CotizacionesPage() {
   const supabase = await createClient()
+  const user = await usuarioDeSesion(supabase)
 
   const [
     { data: cotizaciones },
     { data: clientes },
     { data: productos },
     { data: configData },
-    { data: { user } },
+    { data: perfil },
   ] = await Promise.all([
     supabase
       .from('cotizaciones')
@@ -20,14 +21,8 @@ export default async function CotizacionesPage() {
     supabase.from('clientes').select('id, nombre, rfc, uso_cfdi, regimen_fiscal, descuento, direcciones, contactos').eq('activo', true).order('nombre'),
     supabase.from('productos').select('id, nombre, precio_venta, precio_compra_neto, unidad, imagen_url').eq('activo', true).order('nombre'),
     supabase.from('configuracion').select('iva_porcentaje').single(),
-    supabase.auth.getUser(),
+    supabase.from('usuarios').select('nivel, es_contador').eq('id', user!.id).single(),
   ])
-
-  const { data: perfil } = await supabase
-    .from('usuarios')
-    .select('nivel, es_contador')
-    .eq('id', user!.id)
-    .single()
 
   const nivel = perfil?.nivel ?? 2
   // El nivel 3 no debe recibir costos ni ganancias, aunque la UI ya no los muestre

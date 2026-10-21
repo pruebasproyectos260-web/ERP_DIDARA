@@ -113,6 +113,8 @@ function ProductSearch({
                 <img
                   src={p.imagen_url}
                   alt=""
+                  loading="lazy"
+                  decoding="async"
                   className="w-9 h-9 object-contain rounded border border-gray-100 bg-gray-50 shrink-0"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />
@@ -514,6 +516,8 @@ export default function CotizacionModal({
                       <img
                         src={item.imagen_url}
                         alt={item.descripcion}
+                        loading="lazy"
+                        decoding="async"
                         className="max-w-[90px] max-h-[90px] object-contain rounded-xl border border-gray-200 bg-white p-2 shadow-sm"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                       />

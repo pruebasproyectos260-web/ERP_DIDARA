@@ -20,6 +20,8 @@ export function useSesionCaducada() {
         if (ruta.startsWith('/api/')) {
           avisado = true
           aviso.error('Tu sesión se cerró. Vuelve a iniciar sesión.')
+          // Recarga completa a propósito: limpia todo lo que quedó en pantalla de la sesión cerrada
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
           setTimeout(() => { window.location.href = '/login' }, 2000)
         }
       }

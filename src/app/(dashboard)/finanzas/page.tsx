@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient, usuarioDeSesion } from '@/lib/supabase/server'
 import { faltaMigracionFinanzas, veFinanzas } from '@/lib/finanzas'
 import FinanzasClient from './FinanzasClient'
 
@@ -11,7 +11,7 @@ const VISTAS = ['resumen', 'movimientos', 'fijos', 'cobranza', 'contabilidad'] a
 export default async function FinanzasPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
   const { vista } = await searchParams
   const authClient = await createClient()
-  const { data: { user } } = await authClient.auth.getUser()
+  const user = await usuarioDeSesion(authClient)
   const { data: perfil } = await authClient.from('usuarios').select('nivel, es_contador').eq('id', user!.id).single()
   const completo = veFinanzas(perfil?.nivel ?? 3, perfil?.es_contador ?? false)
 

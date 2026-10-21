@@ -15,7 +15,11 @@ export async function proxy(request: NextRequest) {
   // ── CORS para rutas API ────────────────────────────────
   if (pathname.startsWith('/api/')) {
     const origin = request.headers.get('origin')
-    if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+    // El propio sitio siempre puede llamar a su API (sirve con el dominio y con la dirección de Render)
+    const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host')
+    let mismoSitio = false
+    try { mismoSitio = !!origin && !!host && new URL(origin).host === host } catch { /* origin inválido */ }
+    if (origin && !mismoSitio && !ALLOWED_ORIGINS.includes(origin)) {
       return new NextResponse('Forbidden', { status: 403 })
     }
     if (request.method === 'OPTIONS') {
@@ -55,9 +59,9 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Verifica la firma del token aquí mismo (sin ir a Supabase Auth); si venció, lo renueva y actualiza las cookies
+  const { data } = await supabase.auth.getClaims()
+  const user = data?.claims?.sub ? data.claims : null
 
   // /api/firma/, /api/soporte y /api/cron validan su propio token de enlace (ver src/lib/firma.ts, portal.ts, tareas.ts)
   const publicPaths = ['/login', '/firma-cliente', '/api/firma/', '/soporte', '/api/soporte', '/api/cron']

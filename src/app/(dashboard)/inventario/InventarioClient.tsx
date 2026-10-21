@@ -7,6 +7,7 @@ import ProductoModal from './ProductoModal'
 import { borrar } from '@/lib/api-cliente'
 import { aviso, confirmar } from '@/components/ui/Avisos'
 import { BotonIcono, BotonPrincipal, Buscador, EncabezadoPagina, EstadoVacio } from '@/components/ui/Pagina'
+import { useCargaProgresiva, useMediaQuery } from '@/components/ui/listas'
 
 interface Props {
   productos: Producto[]
@@ -58,6 +59,10 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
         return matchQ && matchCat && matchStock
       })
   }, [productos, busqueda, categoriaFiltro, stockFiltro])
+
+  // Página ligera: una sola vista (tarjetas o tabla) y los productos por tandas conforme se baja
+  const pantallaAncha = useMediaQuery('(min-width: 1280px)')
+  const { visibles, centinela, restantes } = useCargaProgresiva(filtrados)
 
   // Stats
   const totalProductos = productos.length
@@ -166,15 +171,15 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
       )}
 
       {/* Celular, tableta y laptop: tarjetas */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:hidden">
-        {filtrados.map((p) => {
+      {pantallaAncha !== true && <div className="grid gap-3 sm:grid-cols-2 xl:hidden">
+        {visibles.map((p) => {
           const cats = (p.categorias ?? p.categoria ?? '').split(';').map(c => c.trim()).filter(Boolean)
           const estadoStock = p.stock === 0 ? 'bg-red-100 text-red-700' : esBajoStock(p) ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
           return (
             <article key={p.id} className="flex gap-3 rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm shadow-black/[0.02]">
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-white">
                 {p.imagen_url
-                  ? <img src={p.imagen_url} alt="" loading="lazy" className="h-full w-full object-contain"
+                  ? <img src={p.imagen_url} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain"
                       onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
                   : <Package size={22} className="text-gray-300" />}
               </div>
@@ -205,10 +210,10 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
             </article>
           )
         })}
-      </div>
+      </div>}
 
       {/* Pantalla ancha: tabla */}
-      <div className={`hidden overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm shadow-black/[0.02] ${filtrados.length ? 'xl:block' : ''}`}>
+      {pantallaAncha !== false && <div className={`hidden overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm shadow-black/[0.02] ${filtrados.length ? 'xl:block' : ''}`}>
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -232,7 +237,7 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
                 <td colSpan={10 + (puedeVerPrecios ? 2 : 0)} className="text-center py-12 text-gray-400">No se encontraron productos</td>
               </tr>
             )}
-            {filtrados.map((p) => {
+            {visibles.map((p) => {
               const stockBajoItem = p.stock <= p.stock_minimo
               const cats = (p.categorias ?? p.categoria ?? '').split(';').map(c => c.trim()).filter(Boolean)
               return (
@@ -248,6 +253,8 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
                       <img
                         src={p.imagen_url}
                         alt={p.nombre}
+                        loading="lazy"
+                        decoding="async"
                         className="w-10 h-10 object-contain rounded border border-gray-100 bg-gray-50"
                         onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                       />
@@ -327,7 +334,13 @@ export default function InventarioClient({ productos: inicial, ivaDefault, nivel
             })}
           </tbody>
         </table>
-      </div>
+      </div>}
+
+      {restantes > 0 && (
+        <div ref={centinela} className="py-6 text-center text-sm text-gray-400">
+          Cargando más productos… ({restantes} restantes)
+        </div>
+      )}
 
       {modal.open && (
         <ProductoModal

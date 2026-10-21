@@ -59,6 +59,9 @@ export default function Sidebar({ nivel, colapsado, onAlternarColapso, movil = f
                   <li key={href}>
                     <Link
                       href={href}
+                      // Sin pre-carga: con el procesador de Render, preparar las ~12 secciones en segundo plano
+                      // en cada página competía con la que sí se estaba abriendo
+                      prefetch={false}
                       onClick={onCerrar}
                       title={compacto ? `${label}${contadores[href] ? ` (${contadores[href]})` : ''}` : undefined}
                       aria-current={activo ? 'page' : undefined}

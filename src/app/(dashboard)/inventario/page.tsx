@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, usuarioDeSesion } from '@/lib/supabase/server'
 import { NIVEL } from '@/lib/nivel'
 import { ocultarCostosProducto } from '@/lib/campos'
 import InventarioClient from './InventarioClient'
@@ -10,18 +10,13 @@ export default async function InventarioPage({
 }) {
   const { bajoStock, sinStock } = await searchParams
   const supabase = await createClient()
+  const user = await usuarioDeSesion(supabase)
 
-  const [{ data: productos }, { data: configData }, { data: { user } }] = await Promise.all([
+  const [{ data: productos }, { data: configData }, { data: perfil }] = await Promise.all([
     supabase.from('productos').select('*').eq('activo', true).order('nombre'),
     supabase.from('configuracion').select('iva_porcentaje').single(),
-    supabase.auth.getUser(),
+    supabase.from('usuarios').select('nivel').eq('id', user!.id).single(),
   ])
-
-  const { data: perfil } = await supabase
-    .from('usuarios')
-    .select('nivel')
-    .eq('id', user!.id)
-    .single()
 
   const nivel = perfil?.nivel ?? 2
 

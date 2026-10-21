@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { User as SupabaseUser } from '@supabase/supabase-js'
+import type { UsuarioSesion } from '@/lib/supabase/server'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import { COOKIE_SIDEBAR } from './navegacion'
@@ -9,7 +9,7 @@ import { useNovedadesTickets } from './useNovedadesTickets'
 import { useSesionCaducada } from './useSesionCaducada'
 
 interface Props {
-  user: SupabaseUser
+  user: UsuarioSesion
   perfil: { nombre: string; nivel: number } | null
   esContador: boolean
   /** Viene de una cookie leída en el servidor: evita que el menú "salte" al cargar */

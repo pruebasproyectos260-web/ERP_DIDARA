@@ -27,6 +27,21 @@ export async function createClient() {
   )
 }
 
+export interface UsuarioSesion { id: string; email: string }
+
+/**
+ * Usuario de la sesión. La firma del token se verifica aquí mismo (ES256 con la llave pública
+ * de Supabase en caché) en lugar de preguntarle a Supabase Auth en cada página y cada acción.
+ * Si el token ya venció, se renueva solo. Que la cuenta siga activa lo revisa requireNivel.
+ */
+export async function usuarioDeSesion(cliente?: Awaited<ReturnType<typeof createClient>>): Promise<UsuarioSesion | null> {
+  const supabase = cliente ?? await createClient()
+  const { data, error } = await supabase.auth.getClaims()
+  const sub = data?.claims?.sub
+  if (error || !sub) return null
+  return { id: sub, email: typeof data.claims.email === 'string' ? data.claims.email : '' }
+}
+
 export function createServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient, usuarioDeSesion } from '@/lib/supabase/server'
 import { faltaMigracion } from '@/lib/tickets'
 import TicketsClient from './TicketsClient'
 
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 export default async function TicketsPage({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
   const { ver } = await searchParams
   const authClient = await createClient()
-  const { data: { user } } = await authClient.auth.getUser()
+  const user = await usuarioDeSesion(authClient)
   const { data: perfil } = await authClient.from('usuarios').select('nivel').eq('id', user!.id).single()
 
   // tickets no tiene políticas RLS: se lee con service role tras validar la sesión

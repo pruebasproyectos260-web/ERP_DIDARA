@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
-import { createClient } from '@/lib/supabase/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient, usuarioDeSesion } from '@/lib/supabase/server'
 import Shell from '@/components/layout/Shell'
 import { COOKIE_SIDEBAR } from '@/components/layout/navegacion'
 import GastosFijosAlert from '@/components/layout/GastosFijosAlert'
@@ -43,7 +42,7 @@ export default async function DashboardLayout({
   children: React.ReactNode
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await usuarioDeSesion(supabase)
 
   if (!user) redirect('/login')
 

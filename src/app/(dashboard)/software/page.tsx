@@ -1,23 +1,16 @@
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient, usuarioDeSesion } from '@/lib/supabase/server'
 import SoftwareClient from './SoftwareClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function SoftwarePage() {
   const authClient = await createClient()
-  const { data: { user } } = await authClient.auth.getUser()
+  const user = await usuarioDeSesion(authClient)
 
-  const { data: perfil } = await authClient
-    .from('usuarios')
-    .select('nivel')
-    .eq('id', user!.id)
-    .single()
-
-  const supabase = createServiceClient()
-  const { data: software } = await supabase
-    .from('software')
-    .select('*')
-    .order('nombre')
+  const [{ data: perfil }, { data: software }] = await Promise.all([
+    authClient.from('usuarios').select('nivel').eq('id', user!.id).single(),
+    createServiceClient().from('software').select('*').order('nombre'),
+  ])
 
   return (
     <SoftwareClient
