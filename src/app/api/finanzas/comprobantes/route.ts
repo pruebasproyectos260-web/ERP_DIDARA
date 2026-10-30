@@ -3,22 +3,12 @@ import { randomUUID } from 'crypto'
 import { requireNivel } from '@/lib/auth'
 import { hoyMexico, RUTA_COMPROBANTE } from '@/lib/finanzas'
 import { esFinanzas } from '@/lib/finanzas-servidor'
+import { MAX_BYTES_COMPROBANTE as MAX_BYTES, tipoReal } from '@/lib/archivos'
 
 // Fotos de tickets y facturas de los gastos. Se guardan en el bucket PRIVADO "documentos"
 // y solo se ven con un enlace temporal: el dueño del gasto o administración/contabilidad.
 
 const BUCKET = 'documentos'
-const MAX_BYTES = 10 * 1024 * 1024 // las fotos llegan comprimidas (~300 KB); los PDF de factura son chicos
-
-// Se revisa el contenido real del archivo, no solo lo que dice el navegador
-function tipoReal(b: Buffer): { ext: string; mime: string } | null {
-  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { ext: 'jpg', mime: 'image/jpeg' }
-  if (b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { ext: 'png', mime: 'image/png' }
-  if (b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') return { ext: 'webp', mime: 'image/webp' }
-  if (b.toString('ascii', 0, 5) === '%PDF-') return { ext: 'pdf', mime: 'application/pdf' }
-  if (b.toString('ascii', 4, 8) === 'ftyp' && /^(heic|heix|mif1|msf1|hevc)$/.test(b.toString('ascii', 8, 12))) return { ext: 'heic', mime: 'image/heic' }
-  return null
-}
 
 export async function POST(req: NextRequest) {
   const auth = await requireNivel()

@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LogOut, ChevronDown, Moon, Sun, KeyRound, Menu } from 'lucide-react'
+import { LogOut, ChevronDown, Moon, Sun, KeyRound, Menu, Truck, Building2 } from 'lucide-react'
 import type { UsuarioSesion } from '@/lib/supabase/server'
+import { NIVEL } from '@/lib/nivel'
 import CambiarContrasenaModal from './CambiarContrasenaModal'
-import { itemActivo } from './navegacion'
+import { enTransportes, itemActivo } from './navegacion'
 import { alternarTema, useTemaOscuro } from '@/lib/tema'
 import { olvidarDispositivo } from '@/lib/push-cliente'
 
@@ -61,7 +62,11 @@ export default function Header({ user, perfil, esContador, onAbrirMenu }: Props)
     router.refresh()
   }
 
-  const modulo = itemActivo(pathname)
+  const nivel = perfil?.nivel ?? 2
+  const modulo = itemActivo(nivel, pathname)
+  const tcg = enTransportes(nivel, pathname)
+  // Cambiar de empresa: solo el super admin tiene Transportes
+  const superAdmin = nivel === NIVEL.SUPER_ADMIN
   const nombre = perfil?.nombre?.trim() || user.email?.split('@')[0] || 'Usuario'
   const usuario = user.email?.split('@')[0]
   const subLabel = esContador ? 'Contador' : (nivelLabel[perfil?.nivel ?? 2] ?? 'Estándar')
@@ -81,10 +86,21 @@ export default function Header({ user, perfil, esContador, onAbrirMenu }: Props)
             <modulo.icon size={17} />
           </span>
         )}
-        <h1 className="truncate text-[15px] font-semibold text-[var(--text)]">{modulo?.label ?? 'Didara ERP'}</h1>
+        <h1 className="truncate text-[15px] font-semibold text-[var(--text)]">{modulo?.label ?? (tcg ? 'Transportes' : 'Didara ERP')}</h1>
       </div>
 
       <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+        {/* Empresa */}
+        {superAdmin && (
+          <button onClick={() => router.push(tcg ? '/dashboard' : '/transportes/gastos')}
+            title={tcg ? 'Cambiar a Didara TI' : 'Cambiar a Transportes Vicente Guerrero'}
+            aria-label={tcg ? 'Cambiar a Didara TI' : 'Cambiar a Transportes Vicente Guerrero'}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2 py-1.5 text-xs font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] sm:px-2.5">
+            {tcg ? <Building2 size={16} /> : <Truck size={16} />}
+            <span className="hidden sm:inline">{tcg ? 'Didara TI' : 'Transportes'}</span>
+          </button>
+        )}
+
         {/* Tema */}
         <button onClick={alternarTema} title={oscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
           aria-label={oscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}

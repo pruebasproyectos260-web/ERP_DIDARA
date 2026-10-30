@@ -1,7 +1,8 @@
 import {
   LayoutDashboard, Users, Package, FileText, Wrench, Calendar,
-  Wallet, Settings, ClipboardList, Monitor, LifeBuoy,
+  Wallet, Settings, ClipboardList, Monitor, LifeBuoy, House, CalendarCheck, Truck,
 } from 'lucide-react'
+import { NIVEL } from '@/lib/nivel'
 
 export interface ItemNav {
   href: string
@@ -38,14 +39,37 @@ export const GRUPOS_NAV: GrupoNav[] = [
   ] },
 ]
 
-export function gruposVisibles(nivel: number): GrupoNav[] {
+/** Transportes de Carga General Vicente Guerrero: solo el super admin (ver app/(dashboard)/transportes) */
+export const GRUPOS_NAV_TCG: GrupoNav[] = [
+  { titulo: 'Gastos', items: [
+    { href: '/transportes/gastos', label: 'Gastos empresa', icon: Wallet },
+    { href: '/transportes/hogar',  label: 'Gastos hogar',   icon: House },
+  ] },
+  { titulo: 'Personal', items: [
+    { href: '/transportes/asistencia', label: 'Asistencia', icon: CalendarCheck },
+  ] },
+  { titulo: 'Flota', items: [
+    { href: '/transportes/camiones', label: 'Camiones', icon: Truck },
+  ] },
+]
+
+/**
+ * ¿Se muestra Transportes? (cambia el menú, la marca y los colores). Solo para el super admin:
+ * si otro nivel escribe la dirección a mano ve el 404 con el menú normal de Didara.
+ */
+export const enTransportes = (nivel: number, pathname: string) =>
+  nivel === NIVEL.SUPER_ADMIN && (pathname === '/transportes' || pathname.startsWith('/transportes/'))
+
+export function gruposVisibles(nivel: number, pathname = ''): GrupoNav[] {
+  if (enTransportes(nivel, pathname)) return GRUPOS_NAV_TCG
   return GRUPOS_NAV
     .map((g) => ({ ...g, items: g.items.filter((i) => i.ocultarDesdeNivel === undefined || nivel < i.ocultarDesdeNivel) }))
     .filter((g) => g.items.length > 0)
 }
 
-export function itemActivo(pathname: string): ItemNav | undefined {
-  return GRUPOS_NAV.flatMap((g) => g.items).find((i) => pathname === i.href || pathname.startsWith(i.href + '/'))
+export function itemActivo(nivel: number, pathname: string): ItemNav | undefined {
+  return (enTransportes(nivel, pathname) ? GRUPOS_NAV_TCG : GRUPOS_NAV).flatMap((g) => g.items)
+    .find((i) => pathname === i.href || pathname.startsWith(i.href + '/'))
 }
 
 export const COOKIE_SIDEBAR = 'sidebar_colapsado'

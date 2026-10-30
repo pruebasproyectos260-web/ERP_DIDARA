@@ -4,6 +4,7 @@ import { createElement } from 'react'
 import {
   AppWindow, Building2, Bus, Car, Ellipsis, FileText, Fuel, Landmark, Milestone, Package, Paperclip,
   PiggyBank, Receipt, ShieldCheck, Users, UtensilsCrossed, Wrench, Zap, Hammer, CircleDollarSign,
+  Cog, ShoppingCart, House, GraduationCap, HeartPulse, Shirt, Popcorn, Umbrella,
 } from 'lucide-react'
 import { colorCategoria } from '@/lib/finanzas'
 
@@ -14,6 +15,9 @@ const ICONO: Record<string, Icono> = {
   Transporte: Bus, Vehículo: Car, Papelería: Paperclip, Servicios: Zap, Software: AppWindow, Renta: Building2,
   Sueldos: Users, Préstamos: Landmark, Impuestos: Receipt, Otro: Ellipsis,
   Cotización: FileText, Servicio: Wrench, Póliza: ShieldCheck, 'Otro ingreso': PiggyBank,
+  // Transportes
+  Mantenimiento: Wrench, Refacciones: Cog, Seguros: Umbrella, Súper: ShoppingCart, Casa: House,
+  Escuela: GraduationCap, Salud: HeartPulse, Ropa: Shirt, Entretenimiento: Popcorn,
 }
 
 /** Círculo de color con el ícono de la categoría */

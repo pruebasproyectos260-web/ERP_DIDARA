@@ -63,8 +63,9 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getClaims()
   const user = data?.claims?.sub ? data.claims : null
 
-  // /api/firma/, /api/soporte y /api/cron validan su propio token de enlace (ver src/lib/firma.ts, portal.ts, tareas.ts)
-  const publicPaths = ['/login', '/firma-cliente', '/api/firma/', '/soporte', '/api/soporte', '/api/cron']
+  // /api/firma/, /api/soporte, /api/cron y la importación de asistencia validan su propio token
+  // (ver src/lib/firma.ts, portal.ts, tareas.ts, transportes-servidor.ts)
+  const publicPaths = ['/login', '/firma-cliente', '/api/firma/', '/soporte', '/api/soporte', '/api/cron', '/api/transportes/asistencia/importar']
   const isPublic = publicPaths.some((p) => pathname.startsWith(p))
 
   if (!user && !isPublic) {

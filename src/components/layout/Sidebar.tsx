@@ -3,8 +3,8 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { ChevronsLeft, ChevronsRight, X } from 'lucide-react'
-import { gruposVisibles } from './navegacion'
+import { ChevronsLeft, ChevronsRight, Truck, X } from 'lucide-react'
+import { enTransportes, gruposVisibles } from './navegacion'
 
 interface Props {
   nivel: number
@@ -18,23 +18,30 @@ interface Props {
 
 export default function Sidebar({ nivel, colapsado, onAlternarColapso, movil = false, onCerrar, contadores = {} }: Props) {
   const pathname = usePathname()
-  const grupos = gruposVisibles(nivel)
+  const grupos = gruposVisibles(nivel, pathname)
   const compacto = colapsado && !movil
+  const tcg = enTransportes(nivel, pathname)
 
   return (
     <aside
-      className={`relative flex h-full flex-col bg-gradient-to-b from-[#0b2928] to-[#071a19] text-white transition-[width] duration-300 ease-out ${
-        movil ? 'w-72' : compacto ? 'w-[76px]' : 'w-64'
-      }`}
+      className={`relative flex h-full flex-col bg-gradient-to-b text-white transition-[width] duration-300 ease-out ${
+        tcg ? 'from-[#1f1a14] to-[#0f0d0a]' : 'from-[#0b2928] to-[#071a19]'
+      } ${movil ? 'w-72' : compacto ? 'w-[76px]' : 'w-64'}`}
     >
       {/* Marca */}
       <div className={`flex h-16 shrink-0 items-center gap-3 border-b border-white/[0.07] ${compacto ? 'justify-center px-2' : 'px-5'}`}>
-        <Image src="/marca/simbolo.png" alt="" width={24} height={35}
-          className="h-8 w-auto shrink-0 brightness-0 invert" priority />
+        {tcg ? (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-400 text-[#1f1a14]">
+            <Truck size={19} />
+          </span>
+        ) : (
+          <Image src="/marca/simbolo.png" alt="" width={24} height={35}
+            className="h-8 w-auto shrink-0 brightness-0 invert" priority />
+        )}
         {!compacto && (
           <div className="min-w-0 leading-none">
-            <p className="text-[15px] font-semibold tracking-tight">Didara TI</p>
-            <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.14em] text-brand-300/80">ERP</p>
+            <p className="truncate text-[15px] font-semibold tracking-tight">{tcg ? 'Transportes TCG' : 'Didara TI'}</p>
+            <p className="mt-1 truncate text-[11px] font-medium uppercase tracking-[0.14em] text-brand-300/80">{tcg ? 'Vicente Guerrero' : 'ERP'}</p>
           </div>
         )}
         {movil && (

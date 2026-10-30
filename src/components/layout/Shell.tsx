@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import type { UsuarioSesion } from '@/lib/supabase/server'
 import Sidebar from './Sidebar'
 import Header from './Header'
-import { COOKIE_SIDEBAR } from './navegacion'
+import { COOKIE_SIDEBAR, enTransportes } from './navegacion'
 import { useNovedadesTickets } from './useNovedadesTickets'
 import { useSesionCaducada } from './useSesionCaducada'
 
@@ -21,6 +22,8 @@ interface Props {
 
 export default function Shell({ user, perfil, esContador, colapsadoInicial, contadores: contadoresIniciales, children }: Props) {
   const nivel = perfil?.nivel ?? 2
+  // Transportes usa los colores de su marca (ver .empresa-tcg en globals.css)
+  const tcg = enTransportes(nivel, usePathname())
   const [colapsado, setColapsado] = useState(colapsadoInicial)
   const [menuMovil, setMenuMovil] = useState(false)
   const ticketsActivos = useNovedadesTickets(contadoresIniciales?.['/tickets'] ?? 0)
@@ -47,7 +50,7 @@ export default function Shell({ user, perfil, esContador, colapsadoInicial, cont
   }, [menuMovil])
 
   return (
-    <div className="flex h-dvh overflow-hidden">
+    <div className={`flex h-dvh overflow-hidden ${tcg ? 'empresa-tcg' : ''}`}>
       {/* Menú fijo en escritorio */}
       <div className="hidden shrink-0 lg:block">
         <Sidebar nivel={nivel} colapsado={colapsado} onAlternarColapso={alternarColapso} contadores={contadores} />

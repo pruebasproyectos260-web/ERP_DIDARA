@@ -165,6 +165,25 @@ body.dark-mode :is(.border-orange-200, .border-orange-300) { border-color: rgb(2
 body.dark-mode :is(.border-red-200, .border-red-300)       { border-color: rgb(239 68 68 / 0.35) !important; }
 body.dark-mode :is(.border-purple-200, .border-purple-300) { border-color: rgb(168 85 247 / 0.4) !important; }
 
+/* ── Transportes TCG (amarillo del logo: #f5ae27) ──────────
+   Las páginas de /transportes usan "brand-*" igual que Didara; aquí solo cambia el color. */
+.empresa-tcg {
+  --color-brand-50:  #fff8e6;
+  --color-brand-100: #feedbf;
+  --color-brand-200: #fdd98a;
+  --color-brand-300: #f9c24f;
+  --color-brand-400: #f5ae27;
+  --color-brand-500: #dc9314;
+  --color-brand-600: #b5710c;
+  --color-brand-700: #92580f;
+  --color-brand-800: #774712;
+  --color-brand-900: #633b13;
+  --color-brand-950: #391e06;
+}
+body.dark-mode .empresa-tcg :is(.bg-brand-50, .bg-brand-100)              { background-color: rgb(245 174 39 / 0.14) !important; }
+body.dark-mode .empresa-tcg :is(.text-brand-600, .text-brand-700, .text-brand-800) { color: #f9c24f !important; }
+body.dark-mode .empresa-tcg :is(.border-brand-200, .border-brand-300)     { border-color: rgb(245 174 39 / 0.4) !important; }
+
 /* ── Mobile touch scrolling ─────────────────────────────── */
 .overflow-x-auto {
   -webkit-overflow-scrolling: touch;
