@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { calentarPDF } from '@/lib/pdf-cliente'
 import { Plus, ExternalLink, Pencil, Trash2, Eye, X, ArrowUp, ArrowDown, Mail, Loader2, FileText } from 'lucide-react'
 import type { Cotizacion, EstadoCotizacion } from '@/types'
 import CotizacionModal from './CotizacionModal'
@@ -59,6 +60,8 @@ interface MailState {
 
 export default function CotizacionesClient({ cotizaciones: inicial, clientes, productos, ivaDefault, nivel, esContador }: Props) {
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>(inicial)
+  // Chrome se abre en segundo plano: el PDF sale sin esperar a que arranque
+  useEffect(() => { calentarPDF() }, [])
   const [modal, setModal] = useState<{ open: boolean; cotizacion: Cotizacion | null }>({ open: false, cotizacion: null })
   const [filtroEstado, setFiltroEstado] = useState('')
   const [busqueda, setBusqueda] = useState('')

@@ -5,15 +5,36 @@ import puppeteer, { type Browser, type Page } from 'puppeteer-core'
 // era la mayor parte del tiempo de espera. Se cierra solo tras unos minutos sin uso
 // para no ocupar memoria.
 
-const INACTIVIDAD_MS = 5 * 60_000
+const INACTIVIDAD_MS = 10 * 60_000
 
 let navegador: Promise<Browser> | null = null
 let temporizador: ReturnType<typeof setTimeout> | null = null
 let enUso = 0
 
+const enLaNube = () => !!(process.env.RENDER || process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME)
+
+/**
+ * Al arrancar el servidor (ver src/instrumentation.ts): descomprime Chrome de @sparticuz/chromium
+ * sin abrirlo. Es lo más lento del primer PDF después de cada despliegue (~20 s en Render).
+ */
+export async function prepararChromium() {
+  if (!enLaNube()) return
+  const chromium = (await import('@sparticuz/chromium')).default
+  await chromium.executablePath()
+}
+
+/** Abre Chrome por adelantado (al entrar a Reportes o Cotizaciones) para que el PDF salga sin esperar */
+export async function precalentar() {
+  await obtenerNavegador()
+  if (enUso === 0) {
+    if (temporizador) clearTimeout(temporizador)
+    temporizador = setTimeout(() => { void cerrar() }, INACTIVIDAD_MS)
+  }
+}
+
 async function lanzar(): Promise<Browser> {
   // Cloud sin Chrome instalado: Render, Vercel, AWS Lambda → usa @sparticuz/chromium
-  if (process.env.RENDER || process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  if (enLaNube()) {
     const chromium = (await import('@sparticuz/chromium')).default
     return puppeteer.launch({
       args: [...chromium.args, '--disable-dev-shm-usage'],

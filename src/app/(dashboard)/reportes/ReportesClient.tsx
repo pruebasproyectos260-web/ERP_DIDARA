@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { calentarPDF } from '@/lib/pdf-cliente'
 import { useRouter } from 'next/navigation'
 import { Plus, Pencil, Trash2, ExternalLink, Eye, Mail, Loader2, X, BadgeCheck, Copy, Check, MessageCircle, Wrench, Signature } from 'lucide-react'
 import type { Reporte } from '@/types'
@@ -100,6 +101,8 @@ interface MailRepState {
 export default function ReportesClient({ reportes: inicial, clientes, tecnicos, nivel, ticketOrigen = null, cobrado = {} }: Props) {
   const router = useRouter()
   const [reportes, setReportes] = useState<Reporte[]>(inicial)
+  // Chrome se abre en segundo plano: el PDF sale sin esperar a que arranque
+  useEffect(() => { calentarPDF() }, [])
   // Si se llegó desde un ticket (/reportes?ticket=ID), el formulario abre ya precargado
   const [modal, setModal] = useState<{ open: boolean; reporte: Reporte | null }>({
     open: !!ticketOrigen, reporte: null,
