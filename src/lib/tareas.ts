@@ -4,6 +4,8 @@ import { esEncargado } from '@/lib/agenda'
 import { enviarPush } from '@/lib/push'
 import { rangoMes, sumarMeses } from '@/lib/finanzas'
 import { enviarReporteContable } from '@/lib/contabilidad-correo'
+import { NIVEL } from '@/lib/nivel'
+import { fijosPorPagar } from '@/lib/transportes-servidor'
 
 // Tareas que corren solas: Supabase (pg_cron) visita /api/cron cada 15 minutos.
 // Cada aviso se registra en "avisos_enviados" para que nunca salga dos veces.
@@ -106,6 +108,29 @@ export async function envioContableMensual(supabase: Supabase, origen: string, a
     await supabase.from('avisos_enviados').delete().eq('clave', PREFIJO + clave)
     throw e
   }
+}
+
+/**
+ * Transportes, desde las 8 am: un aviso al día al super admin (nivel 0) con los gastos fijos sin pagar
+ * que vencen en 3 días o menos o que ya vencieron. Se repite cada día mientras no se paguen.
+ */
+export async function recordatoriosFijosTCG(supabase: Supabase, ahora: string) {
+  if (Number(ahora.slice(11, 13)) < 8) return 0
+  const hoy = ahora.slice(0, 10)
+  const lista = await fijosPorPagar(supabase, hoy, 3)
+  if (!lista.length) return 0
+  const { data: superAdmins } = await supabase.from('usuarios').select('id').eq('nivel', NIVEL.SUPER_ADMIN).eq('activo', true)
+  const ids = (superAdmins ?? []).map((u) => u.id as string)
+  if (!ids.length || !(await primeraVez(supabase, `tcg-fijos:${hoy}`))) return 0
+  const cuando = (d: number) => (d < 0 ? `venció hace ${-d} d` : d === 0 ? 'vence hoy' : d === 1 ? 'vence mañana' : `vence en ${d} días`)
+  const vencidos = lista.filter((f) => f.diasRestantes < 0).length
+  await enviarPush(supabase, ids, {
+    titulo: vencidos ? `🚚 ${vencidos} gasto${vencidos === 1 ? '' : 's'} fijo${vencidos === 1 ? '' : 's'} vencido${vencidos === 1 ? '' : 's'}` : `🚚 Gastos fijos por pagar`,
+    cuerpo: lista.slice(0, 4).map((f) => `${f.nombre} ${cuando(f.diasRestantes)}`).join(' · ') + (lista.length > 4 ? ` y ${lista.length - 4} más` : ''),
+    url: lista.every((f) => f.ambito === 'hogar') ? '/transportes/hogar' : '/transportes/gastos',
+    etiqueta: `tcg-fijos-${hoy}`,
+  })
+  return lista.length
 }
 
 /** Una vez al día: borra marcas de avisos de hace más de 90 días */

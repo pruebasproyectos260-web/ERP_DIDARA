@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { METODOS_PAGO, redondear } from '@/lib/finanzas'
+import { esquemaMes, METODOS_PAGO, redondear } from '@/lib/finanzas'
 
 // Transportes de Carga General Vicente Guerrero (TCG): módulo privado del super admin (nivel 0).
 // Constantes, validaciones y cálculo de asistencia/aguinaldo, compartidos por servidor y navegador.
@@ -38,6 +38,9 @@ export interface GastoTCG {
   iva: number | null
   comprobantes: string[]
   camion_id: number | null
+  /** Pago de un gasto fijo (y de qué mes) */
+  fijo_id?: number | null
+  mes_fijo?: string | null
   created_at: string
   camion?: { id: number; nombre: string } | null
   /** Si el gasto salió de un trabajo de Camiones (se edita desde ahí) */
@@ -45,6 +48,26 @@ export interface GastoTCG {
 }
 
 export const trabajoDeGasto = (g: Pick<GastoTCG, 'trabajo'>) => (Array.isArray(g.trabajo) ? g.trabajo[0] : g.trabajo) ?? null
+
+/** Gasto que se paga cada mes (renta, luz, internet, colegiatura…) */
+export interface FijoTCG {
+  id: number
+  ambito: Ambito
+  nombre: string
+  categoria: string
+  monto: number
+  dia: number | null
+  desde: string
+  hasta: string | null
+  metodo_pago: string | null
+  con_factura: boolean
+  camion_id: number | null
+  notas: string | null
+  /** Calculado para el mes que se consulta */
+  vigente: boolean
+  vence: string
+  pagado: { id: number; monto: number; fecha: string; metodo_pago: string | null } | null
+}
 
 /** Fotos de tickets de Transportes: tcg/<YYYY-MM>/<uuid>.<ext> en el bucket "documentos" */
 export const RUTA_COMPROBANTE_TCG = /^tcg\/\d{4}-\d{2}\/[0-9a-f-]{36}\.(jpg|png|webp|heic|pdf)$/
@@ -219,10 +242,11 @@ export function resumenAnio(
     r.habilesAnio++
     if ((e.fecha_ingreso && fecha < e.fecha_ingreso) || (e.fecha_baja && fecha > e.fecha_baja)) { dias.set(fecha, 'fuera'); continue }
 
+    // Hoy, mientras no haya registros, todavía no se sabe (cuenta como por venir)
     const marca = manual.get(fecha)
     const estado: EstadoDia = marca
-      ?? (fecha > hoy ? 'futuro'
-        : e.usuario_sistema && conActividad.has(fecha) ? 'registro' : 'sin_registro')
+      ?? (e.usuario_sistema && conActividad.has(fecha) ? 'registro'
+        : fecha >= hoy ? 'futuro' : 'sin_registro')
     dias.set(fecha, estado)
 
     if (CUENTA.has(estado)) r.diasAguinaldo++
@@ -268,6 +292,31 @@ export const esquemaGastoTCG = z.object(camposGasto)
   .refine((d) => d.iva == null || d.iva <= d.monto, { message: 'El IVA no puede ser mayor que el total', path: ['iva'] })
 /** Edición: todo opcional (usar con soloEnviados para no pisar lo que no vino) */
 export const esquemaCambioGastoTCG = z.object(camposGasto).partial()
+
+const camposFijo = {
+  ambito: z.enum(AMBITOS),
+  nombre: z.string().trim().min(2, 'Escribe qué se paga').max(120),
+  categoria: z.string().trim().min(1, 'Elige una categoría').max(60),
+  monto: z.number('Escribe el monto').positive('El monto debe ser mayor a 0').max(10_000_000).transform(redondear),
+  dia: z.number().int().min(1).max(31).nullish().transform((v) => v ?? null),
+  desde: esquemaMes,
+  hasta: esquemaMes.nullish().transform((v) => v ?? null),
+  metodo_pago: metodo,
+  con_factura: z.boolean().default(false),
+  camion_id: idOpcional,
+  notas: opcional(300),
+}
+export const esquemaFijo = z.object(camposFijo)
+  .refine((d) => !d.hasta || d.hasta >= d.desde, { message: 'El último mes no puede ser antes del primero', path: ['hasta'] })
+export const esquemaCambioFijo = z.object(camposFijo).partial()
+
+/** Marcar un fijo como pagado en un mes */
+export const esquemaPagarFijo = z.object({
+  mes: esquemaMes,
+  monto: z.number().positive().max(10_000_000).transform(redondear).optional(),
+  fecha: fecha.optional(),
+  metodo_pago: metodo.optional(),
+})
 
 const camposCamion = {
   nombre: z.string().trim().min(1, 'Escribe el nombre o número del camión').max(60),

@@ -1,7 +1,8 @@
 import crypto from 'crypto'
 import { requireNivel, type Sesion } from '@/lib/auth'
 import { NIVEL } from '@/lib/nivel'
-import { CATEGORIA_TRABAJO, ETIQUETA_TRABAJO, type TipoTrabajo } from '@/lib/transportes'
+import { recurrenteVigente, sumarMeses, vencimiento } from '@/lib/finanzas'
+import { CATEGORIA_TRABAJO, ETIQUETA_TRABAJO, type Ambito, type TipoTrabajo } from '@/lib/transportes'
 
 // Transportes (TCG): todo es solo del super admin (nivel 0). A propósito NO se anota en el
 // registro de actividad: ese lo ven los administradores de nivel 1.
@@ -67,6 +68,33 @@ export async function sincronizarGastoTrabajo(supabase: Sesion['supabase'], t: D
   const { data, error } = await supabase.from('tcg_gastos').insert(gasto).select('id').single()
   if (error) throw error
   return data.id
+}
+
+export interface FijoPorPagar { id: number; ambito: Ambito; nombre: string; monto: number; mes: string; vence: string; diasRestantes: number }
+
+/**
+ * Gastos fijos de Transportes sin pagar que ya vencieron o vencen en `dias` días o menos.
+ * Revisa el mes en curso y el anterior (lo de el mes pasado que no se pagó sigue pendiente).
+ */
+export async function fijosPorPagar(supabase: Sesion['supabase'], hoy: string, dias = 5): Promise<FijoPorPagar[]> {
+  const mes = hoy.slice(0, 7), anterior = sumarMeses(mes, -1)
+  const [{ data: fijos, error }, { data: pagos }] = await Promise.all([
+    supabase.from('tcg_fijos').select('id, ambito, nombre, monto, dia, desde, hasta'),
+    supabase.from('tcg_gastos').select('fijo_id, mes_fijo').in('mes_fijo', [anterior, mes]).not('fijo_id', 'is', null),
+  ])
+  if (error) return [] // sin la migración de fijos todavía
+  const pagado = new Set((pagos ?? []).map((p) => `${p.fijo_id}|${p.mes_fijo}`))
+  const dia = (f: string) => Date.parse(`${f}T12:00:00Z`) / 86_400_000
+  const lista: FijoPorPagar[] = []
+  for (const f of fijos ?? []) {
+    for (const m of [anterior, mes]) {
+      if (!recurrenteVigente(f, m) || pagado.has(`${f.id}|${m}`)) continue
+      const vence = vencimiento(m, f.dia)
+      const diasRestantes = Math.round(dia(vence) - dia(hoy))
+      if (diasRestantes <= dias) lista.push({ id: f.id, ambito: f.ambito, nombre: f.nombre, monto: Number(f.monto), mes: m, vence, diasRestantes })
+    }
+  }
+  return lista.sort((a, b) => a.diasRestantes - b.diasRestantes)
 }
 
 /** Clave con la que la Raspberry manda la asistencia de TALONES/REMI. Se deriva de la llave de Supabase. */

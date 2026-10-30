@@ -20,21 +20,25 @@ interface Datos {
   ultimaLectura: string | null
 }
 
-/** Cómo se pinta cada estado en el calendario */
-const CELDA: Record<EstadoDia, { cls: string; letra: string }> = {
-  registro: { cls: 'bg-emerald-500 text-white', letra: '✓' },
-  asistio: { cls: 'bg-emerald-100 text-emerald-800 ring-1 ring-inset ring-emerald-400', letra: 'A' },
-  sin_registro: { cls: 'bg-amber-100 text-amber-800', letra: '?' },
-  falta: { cls: 'bg-red-500 text-white', letra: 'F' },
-  permiso: { cls: 'bg-gray-400 text-white', letra: 'P' },
-  vacaciones: { cls: 'bg-sky-500 text-white', letra: 'V' },
-  futuro: { cls: 'bg-white ring-1 ring-inset ring-gray-200', letra: '' },
-  cerrado: { cls: 'bg-gray-100 text-gray-400', letra: '–' },
-  no_laborable: { cls: 'bg-gray-50 text-gray-300', letra: '' },
-  fuera: { cls: '', letra: '' },
+/**
+ * Cómo se ve cada día en el calendario de una persona. Solo clases con ajuste de modo oscuro en globals.css.
+ * "presente" es el día sin registros de alguien exento (no usa TALONES/REMI): cuenta como asistido.
+ */
+type Vista = EstadoDia | 'presente'
+const VISTA: Record<Vista, { cls: string; texto: string; corto: string }> = {
+  registro: { cls: 'border-green-200 bg-green-50 text-green-700', texto: 'Asistió', corto: 'Asistió' },
+  asistio: { cls: 'border-green-200 bg-green-50 text-green-700', texto: 'Asistió ✎', corto: 'Asistió' },
+  presente: { cls: 'border-green-200 bg-green-50 text-green-700', texto: 'Presente', corto: 'Presente' },
+  sin_registro: { cls: 'border-amber-200 bg-amber-50 text-amber-800', texto: 'Sin registro', corto: 'Sin reg.' },
+  falta: { cls: 'border-red-200 bg-red-50 text-red-700', texto: 'Falta', corto: 'Falta' },
+  permiso: { cls: 'border-gray-300 bg-gray-100 text-gray-700', texto: 'Permiso', corto: 'Permiso' },
+  vacaciones: { cls: 'border-blue-200 bg-blue-50 text-blue-700', texto: 'Vacaciones', corto: 'Vacac.' },
+  futuro: { cls: 'border-gray-200 bg-white text-gray-400', texto: '', corto: '' },
+  cerrado: { cls: 'border-dashed border-gray-300 bg-white text-gray-400', texto: 'No se trabajó', corto: 'No hubo' },
+  no_laborable: { cls: 'border-transparent bg-transparent text-gray-300', texto: '', corto: '' },
+  fuera: { cls: 'border-transparent bg-transparent text-gray-300', texto: '', corto: '' },
 }
-const LEYENDA: EstadoDia[] = ['registro', 'sin_registro', 'asistio', 'falta', 'permiso', 'vacaciones', 'cerrado', 'no_laborable']
-const LETRA_DIA = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
+const DIAS_SEMANA = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
 const fechaLarga = (f: string) => {
   const t = new Date(`${f}T12:00:00`).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -58,6 +62,7 @@ export default function AsistenciaTCG() {
   const [celda, setCelda] = useState<{ e: EmpleadoTCG; fecha: string } | null>(null)
   const [diaSel, setDiaSel] = useState<string | null>(null)
   const [empleados, setEmpleados] = useState(false)
+  const [personaSel, setPersonaSel] = useState<number | null>(null)
   const [verRevisar, setVerRevisar] = useState(false)
 
   useEffect(() => {
@@ -124,6 +129,19 @@ export default function AsistenciaTCG() {
     (e.activo || (e.fecha_baja ?? '') >= `${anio}-01-01`) && (!e.fecha_ingreso || e.fecha_ingreso <= `${anio}-12-31`))
   const { dias: diasMes } = rangoMes(mes)
   const fechasMes = Array.from({ length: diasMes }, (_, i) => `${mes}-${String(i + 1).padStart(2, '0')}`)
+  // Calendario de pared: semanas de lunes a domingo
+  const huecos = (new Date(`${mes}-01T12:00:00`).getDay() + 6) % 7
+
+  // Persona que se ve en el calendario
+  const persona = activos.find((e) => e.id === personaSel) ?? activos[0] ?? null
+  const resumenPersona = persona ? resumenes.get(persona.id) : undefined
+  // Documentos que hizo la persona cada día (unos cientos de renglones: no hace falta memorizarlo)
+  const usuarioPersona = persona?.usuario_sistema?.toUpperCase() ?? null
+  const docsPersona = new Map((datos?.actividad ?? [])
+    .filter((a) => usuarioPersona && a.usuario === usuarioPersona).map((a) => [a.fecha, a.documentos]))
+  const vistaDe = (est: EstadoDia): Vista => (est === 'sin_registro' && !persona?.usuario_sistema ? 'presente' : est)
+  const delMes = fechasMes.map((f) => resumenPersona?.dias.get(f) ?? 'fuera')
+  const cuenta = (...estados: EstadoDia[]) => delMes.filter((e) => estados.includes(e)).length
 
   function cambiarAnio(n: number) {
     setCargando(true)
@@ -188,7 +206,9 @@ export default function AsistenciaTCG() {
                   <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                     <Dato titulo="Asistió" valor={`${r.asistidosHoy}/${r.habilesHoy}`} cls="text-gray-900" />
                     <Dato titulo="Faltas" valor={String(r.faltas + r.permisos)} cls={r.faltas + r.permisos ? 'text-red-600' : 'text-gray-900'} />
-                    <Dato titulo="Sin registro" valor={String(r.sinRegistro)} cls={r.sinRegistro ? 'text-amber-700' : 'text-gray-900'} />
+                    {e.usuario_sistema
+                      ? <Dato titulo="Sin registro" valor={String(r.sinRegistro)} cls={r.sinRegistro ? 'text-amber-700' : 'text-gray-900'} />
+                      : <Dato titulo="Vacaciones" valor={String(r.vacaciones)} cls="text-gray-900" />}
                   </div>
                   <div className="mt-3 flex items-center gap-3 rounded-xl bg-brand-50 px-3 py-2.5">
                     <Gift size={20} className="shrink-0 text-brand-700" />
@@ -213,7 +233,7 @@ export default function AsistenciaTCG() {
 
           {/* Días por revisar */}
           {porRevisar.length > 0 && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50/60">
+            <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50">
               <button type="button" onClick={() => setVerRevisar((v) => !v)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
                 <AlertTriangle size={18} className="shrink-0 text-amber-600" />
                 <span className="min-w-0 flex-1">
@@ -223,7 +243,7 @@ export default function AsistenciaTCG() {
                 <ChevronRight size={18} className={`shrink-0 text-gray-400 transition-transform ${verRevisar ? 'rotate-90' : ''}`} />
               </button>
               {verRevisar && (
-                <ul className="divide-y divide-amber-100 border-t border-amber-200 bg-white/60">
+                <ul className="divide-y divide-gray-100 border-t border-amber-200 bg-white">
                   {porRevisar.map((d) => (
                     <li key={d.fecha} className="flex flex-wrap items-center gap-2 px-4 py-2.5">
                       <span className="min-w-0 flex-1">
@@ -233,7 +253,7 @@ export default function AsistenciaTCG() {
                         </span>
                       </span>
                       <button type="button" onClick={() => marcarDia(d.fecha, 'laborable')}
-                        className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50">Sí se trabajó</button>
+                        className="rounded-lg border border-green-200 bg-white px-2.5 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50">Sí se trabajó</button>
                       <button type="button" onClick={() => marcarDia(d.fecha, 'cerrado')}
                         className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">No se trabajó</button>
                     </li>
@@ -243,83 +263,76 @@ export default function AsistenciaTCG() {
             </div>
           )}
 
-          {/* Calendario del mes */}
-          <div className="rounded-2xl border border-gray-200 bg-white">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
-              <div className="inline-flex items-center rounded-xl border border-gray-200 p-1">
-                <button type="button" onClick={() => moverMes(-1)} disabled={mes.endsWith('-01')} aria-label="Mes anterior" className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-30"><ChevronLeft size={18} /></button>
-                <span className="min-w-[8.5rem] text-center text-sm font-semibold text-gray-900">{nombreMes(mes)}</span>
-                <button type="button" onClick={() => moverMes(1)} disabled={mes.endsWith('-12')} aria-label="Mes siguiente" className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-30"><ChevronRight size={18} /></button>
+          {/* Calendario de una persona */}
+          {persona && resumenPersona && (
+            <div className="rounded-2xl border border-gray-200 bg-white">
+              <div className="space-y-3 border-b border-gray-100 px-4 py-3">
+                <div className="-mx-4 overflow-x-auto px-4">
+                  <div className="inline-flex gap-1 rounded-xl bg-gray-100 p-1">
+                    {activos.map((e) => (
+                      <button key={e.id} type="button" onClick={() => setPersonaSel(e.id)} aria-pressed={persona.id === e.id}
+                        className={`whitespace-nowrap rounded-lg px-4 py-1.5 text-sm font-semibold transition-colors ${persona.id === e.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>
+                        {e.nombre}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="inline-flex items-center rounded-xl border border-gray-200 p-1">
+                    <button type="button" onClick={() => moverMes(-1)} disabled={mes.endsWith('-01')} aria-label="Mes anterior" className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-30"><ChevronLeft size={18} /></button>
+                    <span className="min-w-[8.5rem] text-center text-sm font-semibold text-gray-900">{nombreMes(mes)}</span>
+                    <button type="button" onClick={() => moverMes(1)} disabled={mes.endsWith('-12')} aria-label="Mes siguiente" className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-30"><ChevronRight size={18} /></button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 text-xs">
+                    <Pastilla cls={VISTA.registro.cls} texto={`Asistió ${cuenta('registro', 'asistio')}`} />
+                    {cuenta('sin_registro') > 0 && <Pastilla cls={VISTA[vistaDe('sin_registro')].cls} texto={`${VISTA[vistaDe('sin_registro')].texto} ${cuenta('sin_registro')}`} />}
+                    {cuenta('falta') > 0 && <Pastilla cls={VISTA.falta.cls} texto={`Faltas ${cuenta('falta')}`} />}
+                    {cuenta('vacaciones') > 0 && <Pastilla cls={VISTA.vacaciones.cls} texto={`Vacaciones ${cuenta('vacaciones')}`} />}
+                    {cuenta('permiso') > 0 && <Pastilla cls={VISTA.permiso.cls} texto={`Permisos ${cuenta('permiso')}`} />}
+                  </div>
+                </div>
               </div>
-              <p className="flex items-center gap-1.5 text-xs text-gray-500"><Info size={13} /> Toca un día para marcar falta, vacaciones o permiso</p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-max min-w-full border-separate border-spacing-0 text-xs">
-                <thead>
-                  <tr>
-                    <th className="sticky left-0 z-10 bg-white px-3 py-2 text-left font-medium text-gray-500">Día</th>
-                    {fechasMes.map((f) => {
-                      const dow = new Date(`${f}T12:00:00`).getDay()
-                      return (
-                        <th key={f} className={`px-0.5 py-1.5 text-center font-medium ${f === hoy ? 'text-brand-700' : dow === 0 ? 'text-gray-300' : 'text-gray-500'}`}>
-                          <span className="block text-[10px]">{LETRA_DIA[dow]}</span>
-                          <span className="block">{Number(f.slice(8))}</span>
-                        </th>
-                      )
-                    })}
-                  </tr>
-                  <tr>
-                    <th className="sticky left-0 z-10 bg-white px-3 pb-2 text-left text-[11px] font-normal text-gray-400">Oficina</th>
-                    {fechasMes.map((f) => {
-                      const info = oficina.get(f)
-                      const est = estadoOficina(f, info, feriados, hoy)
-                      return (
-                        <th key={f} className="px-0.5 pb-2">
-                          <button type="button" onClick={() => setDiaSel(f)} title={`${fechaLarga(f)}: ${info?.documentos ?? 'sin leer'} documentos`}
-                            className={`h-6 w-7 rounded-md text-[10px] font-semibold tabular-nums ${
-                              est === 'cerrado' ? 'bg-gray-200 text-gray-500' : est === 'revisar' ? 'bg-amber-200 text-amber-900'
-                                : est === 'no_laborable' ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-100'} ${info?.estado ? 'ring-1 ring-inset ring-gray-500' : ''}`}>
-                            {est === 'no_laborable' && !info?.documentos ? '' : info?.documentos ?? '·'}
-                          </button>
-                        </th>
-                      )
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {activos.map((e) => {
-                    const r = resumenes.get(e.id)!
+
+              <div className="p-2 sm:p-4">
+                <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                  {DIAS_SEMANA.map((d, i) => (
+                    <p key={i} className={`pb-1 text-center text-[11px] font-semibold uppercase ${i === 6 ? 'text-gray-300' : 'text-gray-400'}`}>{d}</p>
+                  ))}
+                  {Array.from({ length: huecos }, (_, i) => <span key={`h${i}`} />)}
+                  {fechasMes.map((f) => {
+                    const est = resumenPersona.dias.get(f) ?? 'fuera'
+                    const v = VISTA[vistaDe(est)]
+                    const esHoy = f === hoy
+                    const festivo = feriados.has(f)
+                    const poco = estadoOficina(f, oficina.get(f), feriados, hoy) === 'revisar'
+                    const docs = docsPersona.get(f)
+                    const deOficina = est === 'cerrado' || est === 'no_laborable'
                     return (
-                      <tr key={e.id}>
-                        <td className="sticky left-0 z-10 max-w-[9rem] truncate border-t border-gray-100 bg-white px-3 py-1.5 font-medium text-gray-900">{e.nombre}</td>
-                        {fechasMes.map((f) => {
-                          const est = r.dias.get(f) ?? 'fuera'
-                          const editable = !['no_laborable', 'cerrado', 'fuera'].includes(est)
-                          return (
-                            <td key={f} className="border-t border-gray-100 px-0.5 py-1.5 text-center">
-                              <button type="button" disabled={!editable} onClick={() => setCelda({ e, fecha: f })}
-                                title={`${e.nombre} · ${fechaLarga(f)}: ${ETIQUETA_ESTADO[est]}`}
-                                className={`h-7 w-7 rounded-md text-[11px] font-bold transition-transform enabled:hover:scale-110 ${CELDA[est].cls}`}>
-                                {CELDA[est].letra}
-                              </button>
-                            </td>
-                          )
-                        })}
-                      </tr>
+                      <button key={f} type="button" disabled={est === 'fuera'}
+                        onClick={() => (deOficina ? setDiaSel(f) : setCelda({ e: persona, fecha: f }))}
+                        title={`${fechaLarga(f)}: ${festivo && est === 'no_laborable' ? 'Día festivo' : ETIQUETA_ESTADO[est]}${docs ? ` · ${docs} documentos` : ''}`}
+                        className={`relative flex min-h-[3.4rem] flex-col rounded-lg border px-0.5 py-1 text-left transition-colors enabled:hover:border-gray-400 sm:min-h-[4.5rem] sm:rounded-xl sm:p-2 ${v.cls} ${esHoy ? 'ring-2 ring-brand-500 ring-offset-1' : ''}`}>
+                        <span className={`px-0.5 text-xs font-semibold sm:px-0 sm:text-sm ${est === 'no_laborable' || est === 'fuera' ? 'text-gray-400 opacity-50' : 'text-gray-900'}`}>{Number(f.slice(8))}</span>
+                        <span className="mt-auto truncate px-0.5 text-[10px] font-medium leading-tight tracking-tight sm:px-0 sm:text-xs sm:tracking-normal">
+                          {esHoy && est === 'futuro' ? 'Hoy'
+                            : festivo && est === 'no_laborable' ? 'Festivo'
+                              : <><span className="sm:hidden">{v.corto}</span><span className="hidden sm:inline">{v.texto}</span></>}
+                        </span>
+                        {docs ? <span className="hidden text-[10px] text-gray-500 sm:block">{docs} {docs === 1 ? 'documento' : 'documentos'}</span> : null}
+                        {poco && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-amber-500" aria-label="Poco movimiento en la oficina" />}
+                      </button>
                     )
                   })}
-                </tbody>
-              </table>
+                </div>
+                <p className="mt-3 flex items-start gap-1.5 px-1 text-xs text-gray-500">
+                  <Info size={13} className="mt-px shrink-0" />
+                  {persona.usuario_sistema
+                    ? <>Toca un día para marcar falta, vacaciones o permiso. &quot;Sin registro&quot;: ese día la oficina trabajó pero {persona.nombre} no hizo nada en TALONES/REMI; cuenta como asistido salvo que lo marques como falta.</>
+                    : <>{persona.nombre} no usa TALONES/REMI: cuenta como presente salvo que marques falta, vacaciones o permiso.</>}
+                </p>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5 border-t border-gray-100 px-4 py-3">
-              {LEYENDA.map((est) => (
-                <span key={est} className="inline-flex items-center gap-1.5 text-[11px] text-gray-500">
-                  <span className={`inline-flex h-4 w-4 items-center justify-center rounded text-[9px] font-bold ${CELDA[est].cls}`}>{CELDA[est].letra}</span>
-                  {ETIQUETA_ESTADO[est]}
-                </span>
-              ))}
-            </div>
-          </div>
+          )}
         </>
       )}
 
@@ -329,6 +342,7 @@ export default function AsistenciaTCG() {
           actual={resumenes.get(celda.e.id)?.dias.get(celda.fecha) ?? 'futuro'}
           tieneMarca={(datos?.marcas ?? []).some((x) => x.empleado_id === celda.e.id && x.fecha === celda.fecha)}
           onElegir={async (estado) => { await marcarEmpleado(celda.e, celda.fecha, estado); setCelda(null) }}
+          onOficinaCerrada={async () => { await marcarDia(celda.fecha, 'cerrado'); setCelda(null) }}
           onCerrar={() => setCelda(null)}
         />
       )}
@@ -371,16 +385,23 @@ function HojaSimple({ titulo, onCerrar, children }: { titulo: string; onCerrar: 
   )
 }
 
-const OPCIONES_MARCA: { estado: EstadoManual; detalle: string }[] = [
-  { estado: 'asistio', detalle: 'Sí vino aunque no registró nada' },
-  { estado: 'falta', detalle: 'No cuenta para el aguinaldo' },
-  { estado: 'permiso', detalle: 'Permiso sin goce: no cuenta' },
-  { estado: 'vacaciones', detalle: 'Días pagados: sí cuentan' },
+const OPCIONES_MARCA: { estado: EstadoManual; detalle: string; punto: string }[] = [
+  { estado: 'asistio', detalle: 'Sí vino aunque no registró nada', punto: 'bg-green-500' },
+  { estado: 'falta', detalle: 'No vino: no cuenta para el aguinaldo', punto: 'bg-red-500' },
+  { estado: 'permiso', detalle: 'Faltó con permiso: tampoco cuenta', punto: 'bg-gray-400' },
+  { estado: 'vacaciones', detalle: 'Días pagados: sí cuentan', punto: 'bg-blue-500' },
 ]
 
-function MarcarDia({ titulo, actual, tieneMarca, onElegir, onCerrar }: {
+function Pastilla({ cls, texto }: { cls: string; texto: string }) {
+  return <span className={`rounded-full border px-2.5 py-1 font-medium ${cls}`}>{texto}</span>
+}
+
+function MarcarDia({ titulo, actual, tieneMarca, onElegir, onOficinaCerrada, onCerrar }: {
   titulo: string; actual: EstadoDia; tieneMarca: boolean
-  onElegir: (estado: EstadoManual | null) => Promise<void>; onCerrar: () => void
+  onElegir: (estado: EstadoManual | null) => Promise<void>
+  /** El día no se trabajó en la oficina (para todos) */
+  onOficinaCerrada: () => Promise<void>
+  onCerrar: () => void
 }) {
   const [guardando, setGuardando] = useState(false)
   const elegir = async (estado: EstadoManual | null) => { setGuardando(true); await onElegir(estado); setGuardando(false) }
@@ -388,10 +409,10 @@ function MarcarDia({ titulo, actual, tieneMarca, onElegir, onCerrar }: {
     <HojaSimple titulo={titulo} onCerrar={onCerrar}>
       <p className="mb-3 text-xs text-gray-500">Ahora: <span className="font-medium text-gray-800">{ETIQUETA_ESTADO[actual]}</span></p>
       <div className="space-y-1.5">
-        {OPCIONES_MARCA.map(({ estado, detalle }) => (
+        {OPCIONES_MARCA.map(({ estado, detalle, punto }) => (
           <button key={estado} type="button" disabled={guardando} onClick={() => elegir(estado)}
             className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors hover:bg-gray-50 disabled:opacity-60 ${actual === estado ? 'border-brand-500' : 'border-gray-200'}`}>
-            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[11px] font-bold ${CELDA[estado].cls}`}>{CELDA[estado].letra}</span>
+            <span className={`h-3 w-3 shrink-0 rounded-full ${punto}`} />
             <span><span className="block text-sm font-medium text-gray-900">{ETIQUETA_ESTADO[estado]}</span><span className="block text-xs text-gray-500">{detalle}</span></span>
           </button>
         ))}
@@ -401,6 +422,10 @@ function MarcarDia({ titulo, actual, tieneMarca, onElegir, onCerrar }: {
             Quitar la marca (volver a lo de TALONES/REMI)
           </button>
         )}
+        <button type="button" disabled={guardando} onClick={async () => { setGuardando(true); await onOficinaCerrada(); setGuardando(false) }}
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-60">
+          <CalendarX2 size={14} /> Ese día no se trabajó en la oficina (para todos)
+        </button>
       </div>
     </HojaSimple>
   )

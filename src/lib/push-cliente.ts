@@ -59,8 +59,29 @@ export async function activarAvisos() {
     await sub.unsubscribe()
     sub = null
   }
-  sub ??= await registro.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64ABytes(clave) })
+  sub ??= await suscribir(registro, clave)
   await guardarEnServidor(sub)
+}
+
+/**
+ * "Registration failed - push service error" (AbortError): el navegador no logró registrarse con su
+ * servicio de avisos (en Android, el de Google). A veces es pasajero, así que se reintenta una vez.
+ */
+async function suscribir(registro: ServiceWorkerRegistration, clave: string) {
+  const opciones = { userVisibleOnly: true, applicationServerKey: base64ABytes(clave) }
+  try {
+    return await registro.pushManager.subscribe(opciones)
+  } catch (e) {
+    if (!(e instanceof DOMException) || e.name !== 'AbortError') throw e
+    await new Promise((r) => setTimeout(r, 1500))
+    try {
+      return await registro.pushManager.subscribe(opciones)
+    } catch {
+      throw new Error('brave' in navigator
+        ? 'Brave tiene apagado el servicio de avisos. En Configuración → Privacidad y seguridad, activa "Usar los servicios de Google para mensajería push", reinicia Brave y vuelve a intentarlo.'
+        : 'El navegador no pudo conectarse a su servicio de avisos. Revisa que tengas internet y que no haya un bloqueador de anuncios, VPN o "DNS privado" activo. Si tu celular no tiene servicios de Google (algunos Huawei), usa Firefox. Luego vuelve a intentarlo.')
+    }
+  }
 }
 
 /** Deja de recibir avisos en este dispositivo */

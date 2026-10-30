@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileCheck, Loader2, Paperclip, Plus, ReceiptText, Truck, Wrench } from 'lucide-react'
+import { FileCheck, Loader2, Paperclip, Plus, ReceiptText, Repeat, Truck, Wrench } from 'lucide-react'
 import { aviso } from '@/components/ui/Avisos'
 import { Buscador, EncabezadoPagina, EstadoVacio } from '@/components/ui/Pagina'
 import { BurbujaCategoria } from '@/components/finanzas/categorias'
@@ -10,6 +10,7 @@ import SelectorMes from '@/components/finanzas/SelectorMes'
 import { colorCategoria, formatoMoneda, hoyISO, mesActual, nombreMes } from '@/lib/finanzas'
 import { trabajoDeGasto, type Ambito, type Camion, type GastoTCG } from '@/lib/transportes'
 import CapturaGasto from './CapturaGasto'
+import FijosTCG from './FijosTCG'
 import { etiquetaDia } from './comunes'
 
 export default function GastosTCG({ ambito }: { ambito: Ambito }) {
@@ -92,6 +93,8 @@ export default function GastosTCG({ ambito }: { ambito: Ambito }) {
         )}
       </div>
 
+      <FijosTCG ambito={ambito} mes={mes} camiones={camiones} version={recarga} onCambio={recargar} />
+
       {lista.length > 0 && <Buscador valor={busqueda} onCambio={setBusqueda} placeholder="Buscar por concepto, lugar, categoría o camión…" />}
 
       {cargando ? (
@@ -123,6 +126,7 @@ export default function GastosTCG({ ambito }: { ambito: Ambito }) {
                             <span className="truncate text-sm font-medium text-gray-900">{g.descripcion || g.categoria}</span>
                             {trabajo && <Wrench size={12} className="shrink-0 text-gray-400" aria-label="De un trabajo de camión" />}
                             {!trabajo && g.camion_id && <Truck size={12} className="shrink-0 text-gray-400" aria-label="De un camión" />}
+                            {g.fijo_id && <Repeat size={12} className="shrink-0 text-gray-400" aria-label="Gasto fijo" />}
                             {g.con_factura && <FileCheck size={13} className="shrink-0 text-brand-600" aria-label="Con factura" />}
                             {g.comprobantes.length > 0 && <Paperclip size={12} className="shrink-0 text-gray-400" aria-label="Con comprobante" />}
                           </span>

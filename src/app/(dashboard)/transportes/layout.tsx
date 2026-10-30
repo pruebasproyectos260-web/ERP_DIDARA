@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient, createServiceClient, usuarioDeSesion } from '@/lib/supabase/server'
 import { NIVEL } from '@/lib/nivel'
 import { faltaMigracionTCG, NOMBRE_TCG } from '@/lib/transportes'
+import FijosTCGAlert from '@/components/transportes/FijosTCGAlert'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,5 +42,10 @@ export default async function TransportesLayout({ children }: { children: React.
       </div>
     )
   }
-  return children
+  return (
+    <>
+      {children}
+      <FijosTCGAlert />
+    </>
+  )
 }
