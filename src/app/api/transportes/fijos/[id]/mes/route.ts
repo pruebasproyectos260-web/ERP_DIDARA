@@ -10,9 +10,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (auth instanceof NextResponse) return auth
   const { id } = await params
 
-  const parsed = esquemaPagarFijo.safeParse(await leerJson(req))
+  const body = await leerJson(req)
+  const parsed = esquemaPagarFijo.safeParse(body)
   if (!parsed.success) return errorValidacion(parsed.error)
   const { mes, monto, fecha, metodo_pago } = parsed.data
+  // zod deja en null el método aunque no se haya mandado: solo cuenta si vino en la petición
+  const metodoEnviado = 'metodo_pago' in body
 
   const { data: f } = await auth.supabase.from('tcg_fijos').select('*').eq('id', id).single()
   if (!f) return NextResponse.json({ error: 'Gasto fijo no encontrado' }, { status: 404 })
@@ -27,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     categoria: f.categoria,
     descripcion: f.nombre,
     monto: total,
-    metodo_pago: metodo_pago !== undefined ? metodo_pago : f.metodo_pago,
+    metodo_pago: metodoEnviado ? metodo_pago ?? null : f.metodo_pago,
     con_factura: f.con_factura,
     iva: f.con_factura ? ivaIncluido(total) : null,
     camion_id: f.camion_id,
