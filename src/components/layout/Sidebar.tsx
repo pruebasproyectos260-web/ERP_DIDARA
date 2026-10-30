@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { ChevronsLeft, ChevronsRight, Truck, X } from 'lucide-react'
+import { ChevronsLeft, ChevronsRight, X } from 'lucide-react'
 import { enTransportes, gruposVisibles } from './navegacion'
 
 interface Props {
@@ -31,9 +31,8 @@ export default function Sidebar({ nivel, colapsado, onAlternarColapso, movil = f
       {/* Marca */}
       <div className={`flex h-16 shrink-0 items-center gap-3 border-b border-white/[0.07] ${compacto ? 'justify-center px-2' : 'px-5'}`}>
         {tcg ? (
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-400 text-[#1f1a14]">
-            <Truck size={19} />
-          </span>
+          // Versión blanca del logo (para fondo oscuro), sin el texto de abajo
+          <Image src="/marca/transportes-blanco.png" alt="" width={85} height={128} className="h-10 w-auto shrink-0" priority />
         ) : (
           <Image src="/marca/simbolo.png" alt="" width={24} height={35}
             className="h-8 w-auto shrink-0 brightness-0 invert" priority />

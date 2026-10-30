@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LogOut, ChevronDown, Moon, Sun, KeyRound, Menu, Truck, Building2 } from 'lucide-react'
+import Image from 'next/image'
+import { LogOut, ChevronDown, Moon, Sun, KeyRound, Menu, Building2 } from 'lucide-react'
 import type { UsuarioSesion } from '@/lib/supabase/server'
 import { NIVEL } from '@/lib/nivel'
 import CambiarContrasenaModal from './CambiarContrasenaModal'
@@ -96,7 +97,12 @@ export default function Header({ user, perfil, esContador, onAbrirMenu }: Props)
             title={tcg ? 'Cambiar a Didara TI' : 'Cambiar a Transportes Vicente Guerrero'}
             aria-label={tcg ? 'Cambiar a Didara TI' : 'Cambiar a Transportes Vicente Guerrero'}
             className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2 py-1.5 text-xs font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] sm:px-2.5">
-            {tcg ? <Building2 size={16} /> : <Truck size={16} />}
+            {tcg ? <Building2 size={16} /> : (
+              <>
+                <Image src="/marca/transportes.png" alt="" width={85} height={128} className="h-5 w-auto dark:hidden" />
+                <Image src="/marca/transportes-blanco.png" alt="" width={85} height={128} className="hidden h-5 w-auto dark:block" />
+              </>
+            )}
             <span className="hidden sm:inline">{tcg ? 'Didara TI' : 'Transportes'}</span>
           </button>
         )}
