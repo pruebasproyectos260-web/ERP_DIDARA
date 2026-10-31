@@ -257,24 +257,26 @@ export function estadoAceite(
 export const DIAS_AGUINALDO = 15
 export const FUENTES_ACTIVIDAD = ['talones', 'remisiones', 'relaciones', 'caja'] as const
 
-export const ESTADOS_MANUALES = ['asistio', 'falta', 'permiso', 'vacaciones'] as const
+export const ESTADOS_MANUALES = ['asistio', 'falta', 'permiso', 'vacaciones', 'descanso'] as const
 export type EstadoManual = (typeof ESTADOS_MANUALES)[number]
 
 /**
  * Cómo quedó cada día de un empleado:
  * - registro: hizo algo en TALONES/REMI (asistió)
  * - sin_registro: la oficina trabajó pero él no registró nada; cuenta como asistido salvo que se marque falta
+ * - falta_auto: igual, pero para quien captura a diario (sin_registro_es_falta): cuenta como falta
  * - asistio / falta / permiso / vacaciones: marcado a mano (manda sobre lo automático)
  * - futuro: día hábil que aún no llega (para estimar el aguinaldo al cierre del año)
  * - cerrado: nadie registró nada en la oficina (probable feriado): no cuenta ni a favor ni en contra
  * - no_laborable: domingo o día festivo de ley
  * - fuera: antes de su ingreso o después de su baja
  */
-export type EstadoDia = 'registro' | 'sin_registro' | EstadoManual | 'futuro' | 'cerrado' | 'no_laborable' | 'fuera'
+export type EstadoDia = 'registro' | 'sin_registro' | 'falta_auto' | EstadoManual | 'futuro' | 'cerrado' | 'no_laborable' | 'fuera'
 
 export const ETIQUETA_ESTADO: Record<EstadoDia, string> = {
-  registro: 'Asistió (TALONES/REMI)', sin_registro: 'Sin registros: cuenta como asistido', asistio: 'Asistió (marcado)',
-  falta: 'Falta', permiso: 'Permiso sin goce', vacaciones: 'Vacaciones', futuro: 'Por venir',
+  registro: 'Asistió (capturó en TALONES/REMI)', sin_registro: 'Sin registros: cuenta como asistido',
+  falta_auto: 'Falta: no capturó talones ni informes', asistio: 'Asistió (marcado)',
+  falta: 'Falta', permiso: 'Permiso sin goce', vacaciones: 'Vacaciones', descanso: 'Día de descanso', futuro: 'Por venir',
   cerrado: 'No se trabajó', no_laborable: 'Domingo o festivo', fuera: 'No trabajaba aquí',
 }
 
@@ -301,7 +303,7 @@ export function estadoOficina(fecha: string, dia: DiaOficina | undefined, feriad
 }
 
 /** Estados que suman días para el aguinaldo (las vacaciones son días pagados) */
-const CUENTA = new Set<EstadoDia>(['registro', 'sin_registro', 'asistio', 'vacaciones', 'futuro'])
+const CUENTA = new Set<EstadoDia>(['registro', 'sin_registro', 'asistio', 'vacaciones', 'descanso', 'futuro'])
 
 const iso = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 
@@ -340,6 +342,8 @@ export interface EmpleadoTCG {
   fecha_baja: string | null
   activo: boolean
   notas: string | null
+  /** Captura a diario: un día sin talones ni informes cuenta como falta (si no, como asistido) */
+  sin_registro_es_falta: boolean
 }
 
 export interface ResumenAnio {
@@ -354,6 +358,7 @@ export interface ResumenAnio {
   faltas: number
   permisos: number
   vacaciones: number
+  descansos: number
   /** Días que cuentan para el aguinaldo si asiste el resto del año */
   diasAguinaldo: number
   sueldoDiario: number
@@ -366,7 +371,7 @@ export interface ResumenAnio {
  * Los días en que la oficina no trabajó no cuentan ni a favor ni en contra.
  */
 export function resumenAnio(
-  e: Pick<EmpleadoTCG, 'usuario_sistema' | 'sueldo_semanal' | 'fecha_ingreso' | 'fecha_baja'>,
+  e: Pick<EmpleadoTCG, 'usuario_sistema' | 'sueldo_semanal' | 'fecha_ingreso' | 'fecha_baja'> & { sin_registro_es_falta?: boolean | null },
   anio: number,
   conActividad: Set<string>,
   manual: Map<string, EstadoManual>,
@@ -375,7 +380,7 @@ export function resumenAnio(
 ): ResumenAnio {
   const feriados = festivos(anio)
   const dias = new Map<string, EstadoDia>()
-  const r = { habilesAnio: 0, habilesHoy: 0, asistidosHoy: 0, conRegistro: 0, sinRegistro: 0, faltas: 0, permisos: 0, vacaciones: 0, diasAguinaldo: 0 }
+  const r = { habilesAnio: 0, habilesHoy: 0, asistidosHoy: 0, conRegistro: 0, sinRegistro: 0, faltas: 0, permisos: 0, vacaciones: 0, descansos: 0, diasAguinaldo: 0 }
 
   for (const fecha of diasDelAnio(anio)) {
     const deOficina = estadoOficina(fecha, oficina.get(fecha), feriados, hoy)
@@ -388,7 +393,8 @@ export function resumenAnio(
     const marca = manual.get(fecha)
     const estado: EstadoDia = marca
       ?? (e.usuario_sistema && conActividad.has(fecha) ? 'registro'
-        : fecha >= hoy ? 'futuro' : 'sin_registro')
+        : fecha >= hoy ? 'futuro'
+          : e.usuario_sistema && e.sin_registro_es_falta ? 'falta_auto' : 'sin_registro')
     dias.set(fecha, estado)
 
     if (CUENTA.has(estado)) r.diasAguinaldo++
@@ -398,9 +404,10 @@ export function resumenAnio(
     }
     if (estado === 'registro') r.conRegistro++
     else if (estado === 'sin_registro') r.sinRegistro++
-    else if (estado === 'falta') r.faltas++
+    else if (estado === 'falta' || estado === 'falta_auto') r.faltas++
     else if (estado === 'permiso') r.permisos++
     else if (estado === 'vacaciones') r.vacaciones++
+    else if (estado === 'descanso') r.descansos++
   }
 
   const sueldoDiario = redondear(Number(e.sueldo_semanal) / 7)
@@ -527,6 +534,7 @@ const camposEmpleado = {
   fecha_baja: fecha.nullish().transform((v) => v ?? null),
   activo: z.boolean().default(true),
   notas: opcional(500),
+  sin_registro_es_falta: z.boolean().default(false),
 }
 export const esquemaEmpleado = z.object(camposEmpleado)
   .refine((d) => !d.fecha_ingreso || !d.fecha_baja || d.fecha_baja >= d.fecha_ingreso, { message: 'La baja no puede ser antes del ingreso', path: ['fecha_baja'] })
@@ -535,10 +543,13 @@ export const esquemaCambioEmpleado = z.object(camposEmpleado).partial()
 export const esquemaMarcaAsistencia = z.object({
   empleado_id: z.number().int().positive(),
   fecha,
+  /** Opcional: marca todos los días de `fecha` a `hasta` (vacaciones, descansos…) */
+  hasta: fecha.optional(),
   /** null = quitar la marca y volver a lo automático */
   estado: z.enum(ESTADOS_MANUALES).nullable(),
   nota: opcional(200),
-})
+}).refine((d) => !d.hasta || d.hasta >= d.fecha, { message: 'La fecha final no puede ser antes de la inicial', path: ['hasta'] })
+  .refine((d) => !d.hasta || diasEntre(d.fecha, d.hasta) <= 120, { message: 'Marca como mucho 4 meses de una vez', path: ['hasta'] })
 
 /** Decidir a mano si la oficina trabajó un día (null = volver a lo automático) */
 export const esquemaMarcaDia = z.object({

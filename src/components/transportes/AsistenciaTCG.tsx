@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, CalendarX2, ChevronLeft, ChevronRight, Gift, Info, Loader2, Pencil, Plus, RefreshCw, Trash2, Users, X } from 'lucide-react'
+import { AlertTriangle, CalendarRange, CalendarX2, ChevronLeft, ChevronRight, Gift, Info, Loader2, Pencil, Plus, RefreshCw, Trash2, Users, X } from 'lucide-react'
 import { aviso, confirmar } from '@/components/ui/Avisos'
 import { EncabezadoPagina } from '@/components/ui/Pagina'
 import { formatoMoneda, hoyMexico, nombreMes, rangoMes } from '@/lib/finanzas'
@@ -30,9 +30,11 @@ const VISTA: Record<Vista, { cls: string; texto: string; corto: string }> = {
   asistio: { cls: 'border-green-200 bg-green-50 text-green-700', texto: 'Asistió ✎', corto: 'Asistió' },
   presente: { cls: 'border-green-200 bg-green-50 text-green-700', texto: 'Presente', corto: 'Presente' },
   sin_registro: { cls: 'border-amber-200 bg-amber-50 text-amber-800', texto: 'Sin registro', corto: 'Sin reg.' },
+  falta_auto: { cls: 'border-red-200 bg-red-50 text-red-700', texto: 'Falta', corto: 'Falta' },
   falta: { cls: 'border-red-200 bg-red-50 text-red-700', texto: 'Falta', corto: 'Falta' },
   permiso: { cls: 'border-gray-300 bg-gray-100 text-gray-700', texto: 'Permiso', corto: 'Permiso' },
   vacaciones: { cls: 'border-blue-200 bg-blue-50 text-blue-700', texto: 'Vacaciones', corto: 'Vacac.' },
+  descanso: { cls: 'border-purple-200 bg-purple-50 text-purple-700', texto: 'Descanso', corto: 'Desc.' },
   futuro: { cls: 'border-gray-200 bg-white text-gray-400', texto: '', corto: '' },
   cerrado: { cls: 'border-dashed border-gray-300 bg-white text-gray-400', texto: 'No se trabajó', corto: 'No hubo' },
   no_laborable: { cls: 'border-transparent bg-transparent text-gray-300', texto: '', corto: '' },
@@ -63,6 +65,7 @@ export default function AsistenciaTCG() {
   const [diaSel, setDiaSel] = useState<string | null>(null)
   const [empleados, setEmpleados] = useState(false)
   const [personaSel, setPersonaSel] = useState<number | null>(null)
+  const [rango, setRango] = useState<{ empleadoId: number | null } | null>(null)
   const [verRevisar, setVerRevisar] = useState(false)
 
   useEffect(() => {
@@ -167,6 +170,10 @@ export default function AsistenciaTCG() {
               <span className="min-w-[3.5rem] text-center text-sm font-semibold text-gray-900">{anio}</span>
               <button type="button" onClick={() => cambiarAnio(anio + 1)} disabled={anio >= anioActual} aria-label="Año siguiente" className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-30"><ChevronRight size={18} /></button>
             </div>
+            <button onClick={() => setRango({ empleadoId: personaSel })}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <CalendarRange size={16} /> <span className="hidden sm:inline">Vacaciones y descansos</span><span className="sm:hidden">Vacaciones</span>
+            </button>
             <button onClick={() => setEmpleados(true)}
               className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
               <Users size={16} /> Empleados
@@ -197,7 +204,9 @@ export default function AsistenciaTCG() {
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-gray-900">{e.nombre}</p>
                       <p className="text-xs text-gray-500">
-                        {e.usuario_sistema ? <>En el sistema: <span className="font-medium">{e.usuario_sistema}</span></> : 'Exento: presente salvo falta'}
+                        {e.usuario_sistema
+                          ? <>En el sistema: <span className="font-medium">{e.usuario_sistema}</span>{e.sin_registro_es_falta ? ' · sin talones = falta' : ''}</>
+                          : 'Exento: presente salvo falta'}
                         {' · '}{formatoMoneda(e.sueldo_semanal)}/sem
                       </p>
                     </div>
@@ -206,7 +215,7 @@ export default function AsistenciaTCG() {
                   <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                     <Dato titulo="Asistió" valor={`${r.asistidosHoy}/${r.habilesHoy}`} cls="text-gray-900" />
                     <Dato titulo="Faltas" valor={String(r.faltas + r.permisos)} cls={r.faltas + r.permisos ? 'text-red-600' : 'text-gray-900'} />
-                    {e.usuario_sistema
+                    {e.usuario_sistema && !e.sin_registro_es_falta
                       ? <Dato titulo="Sin registro" valor={String(r.sinRegistro)} cls={r.sinRegistro ? 'text-amber-700' : 'text-gray-900'} />
                       : <Dato titulo="Vacaciones" valor={String(r.vacaciones)} cls="text-gray-900" />}
                   </div>
@@ -286,9 +295,10 @@ export default function AsistenciaTCG() {
                   <div className="flex flex-wrap gap-1.5 text-xs">
                     <Pastilla cls={VISTA.registro.cls} texto={`Asistió ${cuenta('registro', 'asistio')}`} />
                     {cuenta('sin_registro') > 0 && <Pastilla cls={VISTA[vistaDe('sin_registro')].cls} texto={`${VISTA[vistaDe('sin_registro')].texto} ${cuenta('sin_registro')}`} />}
-                    {cuenta('falta') > 0 && <Pastilla cls={VISTA.falta.cls} texto={`Faltas ${cuenta('falta')}`} />}
+                    {cuenta('falta', 'falta_auto') > 0 && <Pastilla cls={VISTA.falta.cls} texto={`Faltas ${cuenta('falta', 'falta_auto')}`} />}
                     {cuenta('vacaciones') > 0 && <Pastilla cls={VISTA.vacaciones.cls} texto={`Vacaciones ${cuenta('vacaciones')}`} />}
                     {cuenta('permiso') > 0 && <Pastilla cls={VISTA.permiso.cls} texto={`Permisos ${cuenta('permiso')}`} />}
+                    {cuenta('descanso') > 0 && <Pastilla cls={VISTA.descanso.cls} texto={`Descansos ${cuenta('descanso')}`} />}
                   </div>
                 </div>
               </div>
@@ -327,7 +337,9 @@ export default function AsistenciaTCG() {
                 <p className="mt-3 flex items-start gap-1.5 px-1 text-xs text-gray-500">
                   <Info size={13} className="mt-px shrink-0" />
                   {persona.usuario_sistema
-                    ? <>Toca un día para marcar falta, vacaciones o permiso. &quot;Sin registro&quot;: ese día la oficina trabajó pero {persona.nombre} no hizo nada en TALONES/REMI; cuenta como asistido salvo que lo marques como falta.</>
+                    ? persona.sin_registro_es_falta
+                      ? <>Los días en que la oficina trabajó y {persona.nombre} no capturó talones ni informes cuentan como <b>falta</b>. Si sí vino (o tuvo vacaciones o permiso), toca el día y cámbialo.</>
+                      : <>Toca un día para marcar falta, vacaciones o permiso. &quot;Sin registro&quot;: ese día la oficina trabajó pero {persona.nombre} no capturó talones ni informes; cuenta como asistido salvo que lo marques como falta.</>
                     : <>{persona.nombre} no usa TALONES/REMI: cuenta como presente salvo que marques falta, vacaciones o permiso.</>}
                 </p>
               </div>
@@ -357,6 +369,10 @@ export default function AsistenciaTCG() {
       )}
       {empleados && datos && (
         <Empleados lista={datos.empleados} usuarios={datos.usuarios} onCerrar={() => setEmpleados(false)} onCambio={recargar} />
+      )}
+      {rango && datos && (
+        <MarcarRango empleados={activos} inicial={rango} onCerrar={() => setRango(null)}
+          onGuardado={(n) => { setRango(null); aviso.exito(`${n} día${n === 1 ? '' : 's'} marcado${n === 1 ? '' : 's'}`); recargar() }} />
       )}
     </div>
   )
@@ -390,7 +406,88 @@ const OPCIONES_MARCA: { estado: EstadoManual; detalle: string; punto: string }[]
   { estado: 'falta', detalle: 'No vino: no cuenta para el aguinaldo', punto: 'bg-red-500' },
   { estado: 'permiso', detalle: 'Faltó con permiso: tampoco cuenta', punto: 'bg-gray-400' },
   { estado: 'vacaciones', detalle: 'Días pagados: sí cuentan', punto: 'bg-blue-500' },
+  { estado: 'descanso', detalle: 'Día libre que le diste: no es falta', punto: 'bg-purple-500' },
 ]
+
+/** Marcar varios días seguidos de una persona: vacaciones, descansos, permisos… o quitar las marcas */
+function MarcarRango({ empleados, inicial, onCerrar, onGuardado }: {
+  empleados: EmpleadoTCG[]; inicial: { empleadoId: number | null }; onCerrar: () => void; onGuardado: (dias: number) => void
+}) {
+  const hoy = hoyMexico()
+  const [empleadoId, setEmpleadoId] = useState(String(inicial.empleadoId ?? empleados[0]?.id ?? ''))
+  const [estado, setEstado] = useState<EstadoManual | ''>('vacaciones')
+  const [desde, setDesde] = useState(hoy)
+  const [hasta, setHasta] = useState(hoy)
+  const [nota, setNota] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+
+  async function guardar(ev: React.FormEvent) {
+    ev.preventDefault()
+    setError('')
+    if (!empleadoId) return setError('Elige a la persona')
+    if (hasta < desde) return setError('La fecha final no puede ser antes de la inicial')
+    setGuardando(true)
+    try {
+      const r = await fetch('/api/transportes/asistencia', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empleado_id: Number(empleadoId), fecha: desde, hasta, estado: estado || null, nota: nota.trim() || null }),
+      })
+      const j = await r.json()
+      if (!r.ok) return setError(j.error ?? 'No se pudo guardar')
+      onGuardado(j.dias ?? 0)
+    } catch {
+      setError('Error de red. Revisa tu conexión e intenta de nuevo.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <HojaCaptura titulo="Marcar varios días" onCerrar={onCerrar} onEnviar={guardar}
+      pie={
+        <button type="submit" disabled={guardando}
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-600 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-60">
+          {guardando && <Loader2 size={16} className="animate-spin" />} {estado ? 'Marcar' : 'Quitar las marcas'}
+        </button>
+      }>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-gray-500">Persona</span>
+        <select value={empleadoId} onChange={(e) => setEmpleadoId(e.target.value)} className={claseCampo}>
+          {empleados.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+        </select>
+      </label>
+      <div>
+        <p className="mb-1.5 text-xs font-medium text-gray-500">¿Qué fue?</p>
+        <div className="space-y-1.5">
+          {[...OPCIONES_MARCA.filter((o) => o.estado !== 'asistio'), { estado: '' as const, detalle: 'Vuelven a lo de TALONES/REMI', punto: 'bg-white border border-gray-300' }].map((o) => (
+            <button key={o.estado || 'quitar'} type="button" onClick={() => setEstado(o.estado)}
+              className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left hover:bg-gray-50 ${estado === o.estado ? 'border-brand-500 ring-2 ring-brand-500/15' : 'border-gray-200'}`}>
+              <span className={`h-3 w-3 shrink-0 rounded-full ${o.punto}`} />
+              <span><span className="block text-sm font-medium text-gray-900">{o.estado ? ETIQUETA_ESTADO[o.estado] : 'Quitar marcas'}</span><span className="block text-xs text-gray-500">{o.detalle}</span></span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-gray-500">Desde</span>
+          <input type="date" value={desde} onChange={(e) => { setDesde(e.target.value); if (hasta < e.target.value) setHasta(e.target.value) }} required className={claseCampo} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-gray-500">Hasta (incluido)</span>
+          <input type="date" value={hasta} min={desde} onChange={(e) => setHasta(e.target.value)} required className={claseCampo} />
+        </label>
+      </div>
+      <p className="-mt-2 text-xs text-gray-400">Se marcan solo los días de lunes a sábado que no son festivos.</p>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-gray-500">Nota (opcional)</span>
+        <input value={nota} onChange={(e) => setNota(e.target.value)} maxLength={200} placeholder="Ej. Vacaciones de fin de año" className={claseCampo} />
+      </label>
+      {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">{error}</p>}
+    </HojaCaptura>
+  )
+}
 
 function Pastilla({ cls, texto }: { cls: string; texto: string }) {
   return <span className={`rounded-full border px-2.5 py-1 font-medium ${cls}`}>{texto}</span>
@@ -512,6 +609,7 @@ function EmpleadoModal({ empleado: e, usuarios, onCerrar, onGuardado, onEliminad
   const [baja, setBaja] = useState(e?.fecha_baja ?? '')
   const [activo, setActivo] = useState(e?.activo ?? true)
   const [notas, setNotas] = useState(e?.notas ?? '')
+  const [estricto, setEstricto] = useState(e?.sin_registro_es_falta ?? false)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
   const opcionesUsuario = [...new Set([...usuarios, ...(usuario ? [usuario.toUpperCase()] : [])])].sort()
@@ -528,6 +626,7 @@ function EmpleadoModal({ empleado: e, usuarios, onCerrar, onGuardado, onEliminad
         body: JSON.stringify({
           nombre: nombre.trim(), usuario_sistema: usuario.trim() || null, sueldo_semanal: leerNumero(sueldoTexto),
           fecha_ingreso: ingreso || null, fecha_baja: baja || null, activo, notas: notas.trim() || null,
+          sin_registro_es_falta: !!usuario && estricto,
         }),
       })
       const j = await r.json()
@@ -579,8 +678,15 @@ function EmpleadoModal({ empleado: e, usuarios, onCerrar, onGuardado, onEliminad
           <option value="">Exento: no usa el sistema (presente salvo falta)</option>
           {opcionesUsuario.map((u) => <option key={u} value={u}>{u}</option>)}
         </select>
-        <span className="mt-1 block text-xs text-gray-400">Si hizo algo en TALONES o REMI con ese usuario, ese día asistió.</span>
+        <span className="mt-1 block text-xs text-gray-400">Si capturó un talón o un informe en TALONES o REMI con ese usuario, ese día asistió.</span>
       </label>
+      {usuario && (
+        <div className="rounded-2xl border border-gray-200 p-3">
+          <Interruptor titulo="Sin talones ni informes = falta"
+            detalle={estricto ? 'Captura a diario: un día sin capturar nada cuenta como falta (puedes cambiarlo a mano)' : 'Captura de vez en cuando: un día sin capturar nada cuenta como asistido'}
+            valor={estricto} onCambio={setEstricto} />
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-gray-500">Fecha de ingreso (opcional)</span>

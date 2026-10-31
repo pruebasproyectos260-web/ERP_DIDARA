@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { errorValidacion, leerJson } from '@/lib/campos'
-import { esquemaMarcaAsistencia, faltaMigracionTCG } from '@/lib/transportes'
+import { esLaborable, esquemaMarcaAsistencia, faltaMigracionTCG } from '@/lib/transportes'
 import { soloSuperAdmin } from '@/lib/transportes-servidor'
 
 /**
@@ -36,17 +36,27 @@ export async function GET(req: NextRequest) {
   })
 }
 
-/** Marca (o quita la marca de) un día de un empleado */
+/**
+ * Marca (o quita la marca de) un día de un empleado, o un rango de días (`hasta`): vacaciones,
+ * descansos… En un rango se marcan solo los días de lunes a sábado que no son festivos.
+ */
 export async function PUT(req: NextRequest) {
   const auth = await soloSuperAdmin()
   if (auth instanceof NextResponse) return auth
   const parsed = esquemaMarcaAsistencia.safeParse(await leerJson(req))
   if (!parsed.success) return errorValidacion(parsed.error)
-  const { empleado_id, fecha, estado, nota } = parsed.data
+  const { empleado_id, fecha, hasta, estado, nota } = parsed.data
+
+  const fechas: string[] = []
+  for (let d = new Date(`${fecha}T12:00:00Z`); d.toISOString().slice(0, 10) <= (hasta ?? fecha); d.setUTCDate(d.getUTCDate() + 1)) {
+    const f = d.toISOString().slice(0, 10)
+    if (!hasta || esLaborable(f)) fechas.push(f)
+  }
+  if (!fechas.length) return NextResponse.json({ error: 'En ese rango no hay días hábiles' }, { status: 400 })
 
   const { error } = estado
-    ? await auth.supabase.from('tcg_asistencia').upsert({ empleado_id, fecha, estado, nota }, { onConflict: 'empleado_id,fecha' })
-    : await auth.supabase.from('tcg_asistencia').delete().eq('empleado_id', empleado_id).eq('fecha', fecha)
+    ? await auth.supabase.from('tcg_asistencia').upsert(fechas.map((f) => ({ empleado_id, fecha: f, estado, nota })), { onConflict: 'empleado_id,fecha' })
+    : await auth.supabase.from('tcg_asistencia').delete().eq('empleado_id', empleado_id).in('fecha', fechas)
   if (error) return NextResponse.json({ error: 'No se pudo guardar' }, { status: 500 })
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, dias: fechas.length })
 }
