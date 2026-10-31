@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { errorValidacion, leerJson, soloEnviados } from '@/lib/campos'
-import { esquemaCambioFijo } from '@/lib/transportes'
-import { soloSuperAdmin } from '@/lib/transportes-servidor'
+import { esquemaCambioFijo, type Ambito } from '@/lib/transportes'
+import { soloSuperAdmin, vehiculoDelAmbito } from '@/lib/transportes-servidor'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await soloSuperAdmin()
@@ -13,12 +13,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!parsed.success) return errorValidacion(parsed.error)
   const cambios: Record<string, unknown> = soloEnviados(parsed.data, body)
 
-  const { data: actual } = await auth.supabase.from('tcg_fijos').select('ambito, desde, hasta').eq('id', id).single()
+  const { data: actual } = await auth.supabase.from('tcg_fijos').select('ambito, desde, hasta, camion_id').eq('id', id).single()
   if (!actual) return NextResponse.json({ error: 'Gasto fijo no encontrado' }, { status: 404 })
   const desde = (cambios.desde ?? actual.desde) as string
   const hasta = (cambios.hasta !== undefined ? cambios.hasta : actual.hasta) as string | null
   if (hasta && hasta < desde) return NextResponse.json({ error: 'El último mes no puede ser antes del primero' }, { status: 400 })
-  if ((cambios.ambito ?? actual.ambito) === 'hogar') cambios.camion_id = null
+  if ('camion_id' in cambios || 'ambito' in cambios) {
+    cambios.camion_id = await vehiculoDelAmbito(auth.supabase, (cambios.camion_id ?? actual.camion_id) as number | null, (cambios.ambito ?? actual.ambito) as Ambito)
+  }
 
   const { data, error } = await auth.supabase.from('tcg_fijos').update(cambios).eq('id', id).select('*').single()
   if (error) return NextResponse.json({ error: 'No se pudo guardar' }, { status: 500 })

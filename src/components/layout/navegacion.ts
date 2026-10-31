@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, Package, FileText, Wrench, Calendar,
-  Wallet, Settings, ClipboardList, Monitor, LifeBuoy, House, CalendarCheck, Truck,
+  Wallet, Settings, ClipboardList, Monitor, LifeBuoy, House, CalendarCheck, Truck, Car,
 } from 'lucide-react'
 import { NIVEL } from '@/lib/nivel'
 
@@ -48,8 +48,9 @@ export const GRUPOS_NAV_TCG: GrupoNav[] = [
   { titulo: 'Personal', items: [
     { href: '/transportes/asistencia', label: 'Asistencia', icon: CalendarCheck },
   ] },
-  { titulo: 'Flota', items: [
+  { titulo: 'Vehículos', items: [
     { href: '/transportes/camiones', label: 'Camiones', icon: Truck },
+    { href: '/transportes/carros',   label: 'Carros',   icon: Car },
   ] },
 ]
 

@@ -67,7 +67,7 @@ export default function CapturaGasto({ ambito, gasto: g, camiones, onCerrar, onG
           con_factura: conFactura,
           iva: conFactura && ivaMostrado ? leerNumero(ivaMostrado) : null,
           comprobantes: fotos.comprobantes,
-          camion_id: ambito === 'empresa' && camionId ? Number(camionId) : null,
+          camion_id: camionId ? Number(camionId) : null,
         }),
       })
       const j = await r.json()
@@ -99,7 +99,7 @@ export default function CapturaGasto({ ambito, gasto: g, camiones, onCerrar, onG
       pie={soloLectura ? (
         <button type="button" onClick={() => onIrATrabajo(g?.camion_id ?? null)}
           className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-600 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-700">
-          <Wrench size={16} /> Ver el trabajo en Camiones
+          <Wrench size={16} /> Ver el trabajo en {ambito === 'hogar' ? 'Carros' : 'Camiones'}
         </button>
       ) : (
         <>
@@ -121,7 +121,7 @@ export default function CapturaGasto({ ambito, gasto: g, camiones, onCerrar, onG
       {soloLectura && trabajo && (
         <p className="flex items-start gap-2 rounded-xl bg-brand-50 px-3 py-2 text-xs text-brand-800">
           <Wrench size={15} className="mt-px shrink-0" />
-          Viene de un trabajo {ETIQUETA_TRABAJO[trabajo.tipo].toLowerCase()} de {g?.camion?.nombre ?? 'un camión'}. Para cambiarlo o borrarlo, ábrelo en Camiones.
+          Viene de un trabajo {ETIQUETA_TRABAJO[trabajo.tipo].toLowerCase()} de {g?.camion?.nombre ?? (ambito === 'hogar' ? 'un carro' : 'un camión')}. Para cambiarlo o borrarlo, ábrelo en {ambito === 'hogar' ? 'Carros' : 'Camiones'}.
         </p>
       )}
 
@@ -183,11 +183,11 @@ export default function CapturaGasto({ ambito, gasto: g, camiones, onCerrar, onG
         </label>
       </div>
 
-      {ambito === 'empresa' && camionesVisibles.length > 0 && (
+      {camionesVisibles.length > 0 && (
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-gray-500">Camión (opcional)</span>
+          <span className="mb-1 block text-xs font-medium text-gray-500">{ambito === 'hogar' ? 'Carro (opcional)' : 'Camión (opcional)'}</span>
           <select value={camionId} onChange={(e) => setCamionId(e.target.value)} disabled={soloLectura} className={claseCampo}>
-            <option value="">De la empresa en general</option>
+            <option value="">{ambito === 'hogar' ? 'De la casa en general' : 'De la empresa en general'}</option>
             {camionesVisibles.map((c) => <option key={c.id} value={c.id}>{c.nombre}{c.placas ? ` · ${c.placas}` : ''}</option>)}
           </select>
         </label>

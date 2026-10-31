@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { errorValidacion, leerJson, limpiarBusqueda } from '@/lib/campos'
 import { esquemaMes, rangoMes } from '@/lib/finanzas'
 import { AMBITOS, esquemaGastoTCG, faltaMigracionTCG } from '@/lib/transportes'
-import { SELECT_GASTO_TCG, soloSuperAdmin } from '@/lib/transportes-servidor'
+import { SELECT_GASTO_TCG, soloSuperAdmin, vehiculoDelAmbito } from '@/lib/transportes-servidor'
 
 export async function GET(req: NextRequest) {
   const auth = await soloSuperAdmin()
@@ -37,8 +37,7 @@ export async function POST(req: NextRequest) {
   const parsed = esquemaGastoTCG.safeParse(await leerJson(req))
   if (!parsed.success) return errorValidacion(parsed.error)
   const datos = parsed.data
-  // Solo los gastos de la empresa pueden ser de un camión
-  if (datos.ambito === 'hogar') datos.camion_id = null
+  datos.camion_id = await vehiculoDelAmbito(auth.supabase, datos.camion_id, datos.ambito)
 
   const { data, error } = await auth.supabase.from('tcg_gastos').insert(datos).select(SELECT_GASTO_TCG).single()
   if (error) {

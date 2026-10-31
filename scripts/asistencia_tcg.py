@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """
 Asistencia de Transportes (TCG) para el ERP: lee la copia de TALONES y REMI que tiene la Raspberry de casa
-y manda al ERP quién hizo algo cada día (talón, remisión, relación de viaje o movimiento de caja).
+y manda al ERP quién hizo algo cada día.
 
 Solo LEE los DBF (nunca los modifica). Sin dependencias: Python 3 estándar.
 
-Cada acción cuenta en la fecha en que realmente pasó:
-  talones y remisiones  DOCUMEN    -> FECHA      (quién lo capturó)
-                        COBRADOPOR -> FECHAPAGO  (quién lo cobró en caja)
-                        REGRESO    -> FECHAREGR  (quién registró el regreso)
-  relaciones de viaje   DOCUMEN    -> FECHA,  REGRESO -> FECHAREGR
-  caja                  NOMBREU    -> FECHA
+Cuenta solo lo que el sistema fecha solo al capturarlo (regla del usuario, 2026-10-30):
+  talones (TALONES) y remisiones (REMI)   DOCUMEN -> FECHA   (quién lo capturó)
+  informes (relaciones de viaje)          DOCUMEN -> FECHA
+Los cortes y cobros de caja (CAJAMOVI, COBRADOPOR) y los regresos NO cuentan: se les puede poner cualquier fecha.
 Solo se cuentan los nombres que existen en USUARIOS.DBF (evita basura escrita a mano).
 
 Uso:
@@ -32,9 +30,8 @@ import sys
 import urllib.request
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-# Para ubicar acciones de documentos viejos (un cobro de hoy de un talón de hace un mes) se leen
-# los documentos creados hasta este número de días antes del inicio del periodo
-MARGEN_DIAS = 90
+# Margen hacia atrás al leer desde el final (por si algún registro quedó un poco fuera de orden)
+MARGEN_DIAS = 7
 
 
 def leer_config():
@@ -149,19 +146,11 @@ def recolectar(talones, remi, desde, hasta):
             d = Dbf(ruta)
             for reg in d.desde_el_final(limite):
                 anotar(d.valor(reg, 'FECHA'), d.valor(reg, 'DOCUMEN'), fuente_doc)
-                anotar(d.valor(reg, 'FECHAPAGO'), d.valor(reg, 'COBRADOPOR'), 'caja')
-                anotar(d.valor(reg, 'FECHAREGR'), d.valor(reg, 'REGRESO'), fuente_doc)
         ruta = os.path.join(carpeta, 'RELACION.DBF')
         if os.path.exists(ruta):
             d = Dbf(ruta)
             for reg in d.desde_el_final(limite):
                 anotar(d.valor(reg, 'FECHA'), d.valor(reg, 'DOCUMEN'), 'relaciones')
-                anotar(d.valor(reg, 'FECHAREGR'), d.valor(reg, 'REGRESO'), 'relaciones')
-        ruta = os.path.join(carpeta, 'CAJAMOVI.DBF')
-        if os.path.exists(ruta):
-            d = Dbf(ruta)
-            for reg in d.desde_el_final(limite):
-                anotar(d.valor(reg, 'FECHA'), d.valor(reg, 'NOMBREU'), 'caja')
     return por_usuario, por_dia
 
 

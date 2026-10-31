@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { errorValidacion, leerJson, soloEnviados } from '@/lib/campos'
-import { esquemaCambioGastoTCG } from '@/lib/transportes'
-import { SELECT_GASTO_TCG, soloSuperAdmin } from '@/lib/transportes-servidor'
+import { esquemaCambioGastoTCG, type Ambito } from '@/lib/transportes'
+import { SELECT_GASTO_TCG, soloSuperAdmin, vehiculoDelAmbito } from '@/lib/transportes-servidor'
 
 type Supabase = Exclude<Awaited<ReturnType<typeof soloSuperAdmin>>, NextResponse>['supabase']
 
@@ -26,7 +26,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const parsed = esquemaCambioGastoTCG.safeParse(body)
   if (!parsed.success) return errorValidacion(parsed.error)
   const cambios: Record<string, unknown> = soloEnviados(parsed.data, body)
-  if ((cambios.ambito ?? gasto.ambito) === 'hogar') cambios.camion_id = null
+  if ('camion_id' in cambios || 'ambito' in cambios) {
+    cambios.camion_id = await vehiculoDelAmbito(auth.supabase, (cambios.camion_id ?? gasto.camion_id) as number | null, (cambios.ambito ?? gasto.ambito) as Ambito)
+  }
 
   const monto = (cambios.monto as number | undefined) ?? Number(gasto.monto)
   const iva = cambios.iva !== undefined ? (cambios.iva as number | null) : gasto.iva

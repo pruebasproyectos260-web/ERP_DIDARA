@@ -34,9 +34,10 @@ export default function GastosTCG({ ambito }: { ambito: Ambito }) {
     return () => { cancelado = true }
   }, [ambito, mes, recarga])
 
+  // Vehículos a los que se puede ligar un gasto: camiones (empresa) o carros de la familia (hogar)
   useEffect(() => {
-    if (ambito !== 'empresa') return
-    fetch('/api/transportes/camiones').then((r) => r.json()).then((j) => setCamiones(j.data ?? [])).catch(() => {})
+    fetch(`/api/transportes/camiones?uso=${ambito === 'hogar' ? 'familia' : 'empresa'}`)
+      .then((r) => r.json()).then((j) => setCamiones(j.data ?? [])).catch(() => {})
   }, [ambito])
 
   const recargar = useCallback(() => { setCargando(true); setRecarga((n) => n + 1) }, [])
@@ -162,7 +163,10 @@ export default function GastosTCG({ ambito }: { ambito: Ambito }) {
             recargar()
           }}
           onEliminado={() => { setCaptura(null); aviso.exito('Gasto eliminado'); recargar() }}
-          onIrATrabajo={(camionId) => router.push(camionId ? `/transportes/camiones?camion=${camionId}` : '/transportes/camiones')}
+          onIrATrabajo={(camionId) => {
+            const ruta = ambito === 'hogar' ? '/transportes/carros' : '/transportes/camiones'
+            router.push(camionId ? `${ruta}?camion=${camionId}` : ruta)
+          }}
         />
       )}
     </div>

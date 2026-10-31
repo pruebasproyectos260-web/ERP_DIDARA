@@ -5,7 +5,7 @@ import { enviarPush } from '@/lib/push'
 import { rangoMes, sumarMeses } from '@/lib/finanzas'
 import { enviarReporteContable } from '@/lib/contabilidad-correo'
 import { NIVEL } from '@/lib/nivel'
-import { fijosPorPagar } from '@/lib/transportes-servidor'
+import { fijosPorPagar, pendientesVehiculos } from '@/lib/transportes-servidor'
 
 // Tareas que corren solas: Supabase (pg_cron) visita /api/cron cada 15 minutos.
 // Cada aviso se registra en "avisos_enviados" para que nunca salga dos veces.
@@ -111,26 +111,45 @@ export async function envioContableMensual(supabase: Supabase, origen: string, a
 }
 
 /**
- * Transportes, desde las 8 am: un aviso al día al super admin (nivel 0) con los gastos fijos sin pagar
- * que vencen en 3 días o menos o que ya vencieron. Se repite cada día mientras no se paguen.
+ * Transportes, desde las 8 am: un solo aviso al día al super admin (nivel 0), solo si hay algo:
+ * - Gastos fijos sin pagar: a 3 días o menos y vencidos (diario); los no mensuales también a 15 y a 7 días.
+ * - Documentos de vehículos: el día 1 del mes en que tocan, a 30, 15, 7 y 1 día, el día que vencen,
+ *   y los vencidos cada lunes.
+ * - Cambio de aceite próximo o pasado: cada lunes.
+ * Devuelve cuántos pendientes se avisaron.
  */
-export async function recordatoriosFijosTCG(supabase: Supabase, ahora: string) {
+export async function recordatoriosTCG(supabase: Supabase, ahora: string) {
   if (Number(ahora.slice(11, 13)) < 8) return 0
   const hoy = ahora.slice(0, 10)
-  const lista = await fijosPorPagar(supabase, hoy, 3)
-  if (!lista.length) return 0
+  const lunes = new Date(`${hoy}T12:00:00Z`).getUTCDay() === 1
+  const [fijos, vehiculos] = await Promise.all([fijosPorPagar(supabase, hoy, 3), pendientesVehiculos(supabase, hoy)])
+
+  const cuando = (d: number) => (d < 0 ? `venció hace ${-d} d` : d === 0 ? 'vence hoy' : d === 1 ? 'vence mañana' : `vence en ${d} días`)
+  const lineas: string[] = []
+  for (const f of fijos) {
+    if (f.diasRestantes <= 3 || (f.cada_meses > 1 && (f.diasRestantes === 15 || f.diasRestantes === 7))) lineas.push(`${f.nombre} ${cuando(f.diasRestantes)}`)
+  }
+  for (const v of vehiculos) {
+    const d = v.diasRestantes
+    if (v.tipo === 'documento' && d != null) {
+      const avisar = d < 0 ? lunes : [30, 15, 7, 1, 0].includes(d) || (hoy.endsWith('-01') && v.estado === 'este_mes')
+      if (avisar) lineas.push(`${v.titulo} de ${v.vehiculo} ${cuando(d)}`)
+    } else if (v.tipo === 'aceite' && lunes) {
+      lineas.push(`Cambio de aceite de ${v.vehiculo}${v.faltanKm != null ? (v.faltanKm <= 0 ? ` (pasado por ${(-v.faltanKm).toLocaleString('es-MX')} km)` : ` (faltan ${v.faltanKm.toLocaleString('es-MX')} km)`) : ''}`)
+    }
+  }
+  if (!lineas.length) return 0
+
   const { data: superAdmins } = await supabase.from('usuarios').select('id').eq('nivel', NIVEL.SUPER_ADMIN).eq('activo', true)
   const ids = (superAdmins ?? []).map((u) => u.id as string)
   if (!ids.length || !(await primeraVez(supabase, `tcg-fijos:${hoy}`))) return 0
-  const cuando = (d: number) => (d < 0 ? `venció hace ${-d} d` : d === 0 ? 'vence hoy' : d === 1 ? 'vence mañana' : `vence en ${d} días`)
-  const vencidos = lista.filter((f) => f.diasRestantes < 0).length
   await enviarPush(supabase, ids, {
-    titulo: vencidos ? `🚚 ${vencidos} gasto${vencidos === 1 ? '' : 's'} fijo${vencidos === 1 ? '' : 's'} vencido${vencidos === 1 ? '' : 's'}` : `🚚 Gastos fijos por pagar`,
-    cuerpo: lista.slice(0, 4).map((f) => `${f.nombre} ${cuando(f.diasRestantes)}`).join(' · ') + (lista.length > 4 ? ` y ${lista.length - 4} más` : ''),
-    url: lista.every((f) => f.ambito === 'hogar') ? '/transportes/hogar' : '/transportes/gastos',
-    etiqueta: `tcg-fijos-${hoy}`,
+    titulo: `🚚 Transportes: ${lineas.length} pendiente${lineas.length === 1 ? '' : 's'}`,
+    cuerpo: lineas.slice(0, 4).join(' · ') + (lineas.length > 4 ? ` y ${lineas.length - 4} más` : ''),
+    url: fijos.length && !vehiculos.length ? (fijos.every((f) => f.ambito === 'hogar') ? '/transportes/hogar' : '/transportes/gastos') : '/transportes/camiones',
+    etiqueta: `tcg-${hoy}`,
   })
-  return lista.length
+  return lineas.length
 }
 
 /** Una vez al día: borra marcas de avisos de hace más de 90 días */

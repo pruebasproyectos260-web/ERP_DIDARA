@@ -18,12 +18,10 @@ export const CATEGORIAS_TCG: Record<Ambito, readonly string[]> = {
     'Seguros', 'Impuestos', 'Papelería', 'Préstamos', 'Otro',
   ],
   hogar: [
-    'Súper', 'Comida', 'Servicios', 'Casa', 'Escuela', 'Salud', 'Transporte', 'Ropa', 'Entretenimiento',
-    'Préstamos', 'Otro',
+    'Súper', 'Comida', 'Servicios', 'Casa', 'Escuela', 'Salud', 'Transporte', 'Vehículo', 'Ropa', 'Entretenimiento',
+    'Seguros', 'Préstamos', 'Otro',
   ],
 }
-/** Categoría con la que entra el gasto de un trabajo hecho a un camión */
-export const CATEGORIA_TRABAJO = 'Mantenimiento'
 
 export interface GastoTCG {
   id: number
@@ -49,7 +47,7 @@ export interface GastoTCG {
 
 export const trabajoDeGasto = (g: Pick<GastoTCG, 'trabajo'>) => (Array.isArray(g.trabajo) ? g.trabajo[0] : g.trabajo) ?? null
 
-/** Gasto que se paga cada mes (renta, luz, internet, colegiatura…) */
+/** Gasto que se repite: cada mes (renta, luz, colegiatura) o cada varios meses (seguros, tenencia…) */
 export interface FijoTCG {
   id: number
   ambito: Ambito
@@ -57,8 +55,11 @@ export interface FijoTCG {
   categoria: string
   monto: number
   dia: number | null
+  /** Mes del primer pago ('YYYY-MM') */
   desde: string
   hasta: string | null
+  /** 1 = mensual, 3 = trimestral, 6 = semestral, 12 = anual… */
+  cada_meses: number
   metodo_pago: string | null
   con_factura: boolean
   camion_id: number | null
@@ -66,7 +67,37 @@ export interface FijoTCG {
   /** Calculado para el mes que se consulta */
   vigente: boolean
   vence: string
+  /** Siguiente mes en que toca pagar (desde el mes consultado) */
+  proximo: string | null
   pagado: { id: number; monto: number; fecha: string; metodo_pago: string | null } | null
+}
+
+export const PERIODOS = [
+  { meses: 1, nombre: 'Cada mes' }, { meses: 2, nombre: 'Cada 2 meses' }, { meses: 3, nombre: 'Cada 3 meses (trimestral)' },
+  { meses: 4, nombre: 'Cada 4 meses' }, { meses: 6, nombre: 'Cada 6 meses (semestral)' }, { meses: 12, nombre: 'Cada año' },
+] as const
+export const nombrePeriodo = (meses: number) =>
+  meses === 1 ? 'mensual' : meses === 12 ? 'anual' : meses === 6 ? 'semestral' : meses === 3 ? 'trimestral' : `cada ${meses} meses`
+
+/** Meses entre dos 'YYYY-MM' (b − a) */
+export const mesesEntre = (a: string, b: string) =>
+  (Number(b.slice(0, 4)) - Number(a.slice(0, 4))) * 12 + Number(b.slice(5, 7)) - Number(a.slice(5, 7))
+
+/** ¿Toca pagar este fijo en ese mes? (dentro de su vigencia y en su ciclo de cada N meses) */
+export function fijoAplica(f: { desde: string; hasta: string | null; cada_meses?: number | null }, mes: string) {
+  const n = mesesEntre(f.desde, mes)
+  return n >= 0 && (!f.hasta || mes <= f.hasta) && n % Math.max(1, f.cada_meses ?? 1) === 0
+}
+
+/** Primer mes desde `mes` (incluido) en que toca pagar; null si ya terminó */
+export function proximoMesFijo(f: { desde: string; hasta: string | null; cada_meses?: number | null }, mes: string) {
+  const cada = Math.max(1, f.cada_meses ?? 1)
+  const n = Math.max(0, mesesEntre(f.desde, mes))
+  const salto = Math.ceil(n / cada) * cada
+  const [a, m] = f.desde.split('-').map(Number)
+  const d = new Date(a, m - 1 + salto, 1)
+  const proximo = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  return f.hasta && proximo > f.hasta ? null : proximo
 }
 
 /** Fotos de tickets de Transportes: tcg/<YYYY-MM>/<uuid>.<ext> en el bucket "documentos" */
@@ -84,6 +115,17 @@ export const COLOR_TRABAJO: Record<TipoTrabajo, string> = {
   mecanico: '#2563eb', electrico: '#d97706', carroceria: '#7c3aed', neumaticos: '#334155', otro: '#64748b',
 }
 
+/** Vehículos: camiones de la empresa o carros de la familia (misma tabla tcg_camiones) */
+export const USOS = ['empresa', 'familia'] as const
+export type Uso = (typeof USOS)[number]
+/** A dónde van los gastos de un vehículo y con qué categoría */
+export const AMBITO_DE_USO: Record<Uso, Ambito> = { empresa: 'empresa', familia: 'hogar' }
+export const CATEGORIA_TRABAJO: Record<Uso, string> = { empresa: 'Mantenimiento', familia: 'Vehículo' }
+export const NOMBRE_USO: Record<Uso, { uno: string; varios: string }> = {
+  empresa: { uno: 'camión', varios: 'camiones' },
+  familia: { uno: 'carro', varios: 'carros' },
+}
+
 export interface Camion {
   id: number
   nombre: string
@@ -93,6 +135,11 @@ export interface Camion {
   anio: number | null
   notas: string | null
   activo: boolean
+  uso: Uso
+  aceite_cada_km: number | null
+  aceite_cada_meses: number | null
+  aceite_ultimo_km: number | null
+  aceite_ultima_fecha: string | null
 }
 
 export interface Trabajo {
@@ -106,7 +153,102 @@ export interface Trabajo {
   costo: number
   gasto_id: number | null
   notas: string | null
+  cambio_aceite: boolean
   gasto?: { id: number; metodo_pago: string | null; con_factura: boolean; iva: number | null; comprobantes: string[] } | null
+}
+
+// ── Documentos de vehículos ────────────────────────────────────────────────
+
+export const TIPOS_DOCUMENTO = [
+  'seguro', 'verificacion_fisico', 'verificacion_emisiones', 'verificacion', 'tarjeta_circulacion', 'tenencia',
+  'permiso', 'factura', 'otro',
+] as const
+export type TipoDocumento = (typeof TIPOS_DOCUMENTO)[number]
+export const ETIQUETA_DOCUMENTO: Record<TipoDocumento, string> = {
+  seguro: 'Seguro', verificacion_fisico: 'Verificación físico-mecánica', verificacion_emisiones: 'Verificación de emisiones',
+  verificacion: 'Verificación', tarjeta_circulacion: 'Tarjeta de circulación', tenencia: 'Tenencia / refrendo',
+  permiso: 'Permiso SCT', factura: 'Factura', otro: 'Otro',
+}
+/** Lo que se da de alta al agregar un vehículo (vacío, para llenar fecha y archivo) */
+export const DOCUMENTOS_INICIALES: Record<Uso, { tipo: TipoDocumento; cada_meses: number | null }[]> = {
+  empresa: [
+    { tipo: 'seguro', cada_meses: 12 }, { tipo: 'verificacion_fisico', cada_meses: 6 },
+    { tipo: 'verificacion_emisiones', cada_meses: 6 }, { tipo: 'tarjeta_circulacion', cada_meses: null },
+  ],
+  familia: [
+    { tipo: 'seguro', cada_meses: 12 }, { tipo: 'verificacion', cada_meses: 6 },
+    { tipo: 'tenencia', cada_meses: 12 }, { tipo: 'tarjeta_circulacion', cada_meses: null },
+  ],
+}
+
+export interface DocumentoTCG {
+  id: number
+  camion_id: number
+  tipo: TipoDocumento
+  nombre: string
+  vence: string | null
+  cada_meses: number | null
+  archivos: string[]
+  notas: string | null
+  updated_at: string
+}
+
+export type EstadoVencimiento = 'vencido' | 'este_mes' | 'pronto' | 'ok' | 'sin_fecha'
+/** Vencido · toca este mes · en 30 días o menos · al corriente · sin fecha */
+export function estadoVencimiento(vence: string | null, hoy: string): EstadoVencimiento {
+  if (!vence) return 'sin_fecha'
+  if (vence < hoy) return 'vencido'
+  if (vence.slice(0, 7) === hoy.slice(0, 7)) return 'este_mes'
+  return diasEntre(hoy, vence) <= 30 ? 'pronto' : 'ok'
+}
+
+export const diasEntre = (a: string, b: string) =>
+  Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86_400_000)
+
+/** Suma meses a una fecha 'YYYY-MM-DD' (el 31 se ajusta a meses cortos) */
+export function sumarMesesFecha(fecha: string, meses: number) {
+  const [a, m, d] = fecha.split('-').map(Number)
+  const ultimo = new Date(Date.UTC(a, m - 1 + meses + 1, 0)).getUTCDate()
+  const r = new Date(Date.UTC(a, m - 1 + meses, Math.min(d, ultimo)))
+  return r.toISOString().slice(0, 10)
+}
+
+// ── Kilometraje y cambio de aceite ─────────────────────────────────────────
+
+/** Al faltar esto o menos para el cambio de aceite, avisa */
+export const AVISO_ACEITE_KM = 1000
+export const AVISO_ACEITE_DIAS = 15
+
+export interface EstadoAceite {
+  estado: 'sin_datos' | 'ok' | 'pronto' | 'vencido'
+  /** Último cambio (de un trabajo marcado como cambio de aceite o el que se capturó al dar de alta) */
+  ultimoKm: number | null
+  ultimaFecha: string | null
+  proximoKm: number | null
+  proximaFecha: string | null
+  faltanKm: number | null
+  faltanDias: number | null
+}
+
+/** Cambio de aceite por km o por meses, lo que pase primero */
+export function estadoAceite(
+  c: Pick<Camion, 'aceite_cada_km' | 'aceite_cada_meses' | 'aceite_ultimo_km' | 'aceite_ultima_fecha'>,
+  kmActual: number | null,
+  ultimoTrabajo: { km: number | null; fecha: string } | null,
+  hoy: string,
+): EstadoAceite {
+  // El cambio más reciente: el del trabajo si es posterior al que se capturó a mano
+  const usarTrabajo = ultimoTrabajo && (!c.aceite_ultima_fecha || ultimoTrabajo.fecha >= c.aceite_ultima_fecha)
+  const ultimoKm = usarTrabajo ? ultimoTrabajo.km : c.aceite_ultimo_km
+  const ultimaFecha = usarTrabajo ? ultimoTrabajo.fecha : c.aceite_ultima_fecha
+  const proximoKm = c.aceite_cada_km && ultimoKm != null ? ultimoKm + c.aceite_cada_km : null
+  const proximaFecha = c.aceite_cada_meses && ultimaFecha ? sumarMesesFecha(ultimaFecha, c.aceite_cada_meses) : null
+  const faltanKm = proximoKm != null && kmActual != null ? proximoKm - kmActual : null
+  const faltanDias = proximaFecha ? diasEntre(hoy, proximaFecha) : null
+  if (faltanKm == null && faltanDias == null) return { estado: 'sin_datos', ultimoKm, ultimaFecha, proximoKm, proximaFecha, faltanKm, faltanDias }
+  const estado = (faltanKm != null && faltanKm <= 0) || (faltanDias != null && faltanDias < 0) ? 'vencido'
+    : (faltanKm != null && faltanKm <= AVISO_ACEITE_KM) || (faltanDias != null && faltanDias <= AVISO_ACEITE_DIAS) ? 'pronto' : 'ok'
+  return { estado, ultimoKm, ultimaFecha, proximoKm, proximaFecha, faltanKm, faltanDias }
 }
 
 // ── Asistencia y aguinaldo ─────────────────────────────────────────────────
@@ -301,6 +443,7 @@ const camposFijo = {
   dia: z.number().int().min(1).max(31).nullish().transform((v) => v ?? null),
   desde: esquemaMes,
   hasta: esquemaMes.nullish().transform((v) => v ?? null),
+  cada_meses: z.number().int().min(1).max(24).default(1),
   metodo_pago: metodo,
   con_factura: z.boolean().default(false),
   camion_id: idOpcional,
@@ -318,20 +461,46 @@ export const esquemaPagarFijo = z.object({
   metodo_pago: metodo.optional(),
 })
 
+const kmOpcional = z.number().int().min(0).max(10_000_000).nullish().transform((v) => v ?? null)
 const camposCamion = {
-  nombre: z.string().trim().min(1, 'Escribe el nombre o número del camión').max(60),
+  nombre: z.string().trim().min(1, 'Escribe el nombre o número del vehículo').max(60),
   placas: opcional(20),
   marca: opcional(60),
   modelo: opcional(60),
   anio: z.number().int().min(1950).max(2100).nullish().transform((v) => v ?? null),
   notas: opcional(500),
   activo: z.boolean().default(true),
+  uso: z.enum(USOS).default('empresa'),
+  aceite_cada_km: z.number().int().min(100).max(200_000).nullish().transform((v) => v ?? null),
+  aceite_cada_meses: z.number().int().min(1).max(24).nullish().transform((v) => v ?? null),
+  aceite_ultimo_km: kmOpcional,
+  aceite_ultima_fecha: fecha.nullish().transform((v) => v ?? null),
 }
 export const esquemaCamion = z.object(camposCamion)
 export const esquemaCambioCamion = z.object(camposCamion).partial()
 
+/** Lectura del odómetro */
+export const esquemaKilometraje = z.object({
+  camion_id: z.number().int().positive(),
+  fecha,
+  km: z.number('Escribe el kilometraje').int().min(0).max(10_000_000),
+  nota: opcional(200),
+})
+
+const camposDocumento = {
+  camion_id: z.number().int().positive(),
+  tipo: z.enum(TIPOS_DOCUMENTO, 'Elige el tipo de documento'),
+  nombre: z.string().trim().min(2, 'Escribe el nombre del documento').max(120),
+  vence: fecha.nullish().transform((v) => v ?? null),
+  cada_meses: z.number().int().min(1).max(60).nullish().transform((v) => v ?? null),
+  archivos: z.array(z.string().regex(RUTA_COMPROBANTE_TCG, 'Archivo inválido')).max(20, 'Máximo 20 archivos').default([]),
+  notas: opcional(500),
+}
+export const esquemaDocumento = z.object(camposDocumento)
+export const esquemaCambioDocumento = z.object(camposDocumento).partial()
+
 const camposTrabajo = {
-  camion_id: z.number('Elige el camión').int().positive('Elige el camión'),
+  camion_id: z.number('Elige el vehículo').int().positive('Elige el vehículo'),
   fecha,
   tipo: z.enum(TIPOS_TRABAJO, 'Elige el tipo de trabajo'),
   descripcion: z.string().trim().min(2, 'Describe el trabajo').max(500),
@@ -339,6 +508,7 @@ const camposTrabajo = {
   kilometraje: z.number().int().min(0).max(10_000_000).nullish().transform((v) => v ?? null),
   costo: z.number().min(0, 'El costo no puede ser negativo').max(10_000_000).default(0).transform(redondear),
   notas: opcional(500),
+  cambio_aceite: z.boolean().default(false),
   // Del gasto que genera (si costó algo)
   metodo_pago: metodo,
   con_factura: z.boolean().default(false),

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { errorValidacion, leerJson } from '@/lib/campos'
-import { esquemaMes, hoyMexico, recurrenteVigente, vencimiento } from '@/lib/finanzas'
-import { AMBITOS, esquemaFijo, faltaMigracionTCG } from '@/lib/transportes'
-import { soloSuperAdmin } from '@/lib/transportes-servidor'
+import { esquemaMes, hoyMexico, vencimiento } from '@/lib/finanzas'
+import { AMBITOS, esquemaFijo, faltaMigracionTCG, fijoAplica, proximoMesFijo } from '@/lib/transportes'
+import { soloSuperAdmin, vehiculoDelAmbito } from '@/lib/transportes-servidor'
 
 /** Gastos fijos de un ámbito, con si aplican en el mes, cuándo vencen y si ya se pagaron */
 export async function GET(req: NextRequest) {
@@ -26,8 +26,10 @@ export async function GET(req: NextRequest) {
     const p = (pagos.data ?? []).find((x) => x.fijo_id === f.id)
     return {
       ...f,
-      vigente: recurrenteVigente(f, mes),
+      cada_meses: Number(f.cada_meses ?? 1),
+      vigente: fijoAplica(f, mes),
       vence: vencimiento(mes, f.dia),
+      proximo: proximoMesFijo(f, mes),
       pagado: p ? { id: p.id, monto: Number(p.monto), fecha: p.fecha, metodo_pago: p.metodo_pago } : null,
     }
   })
@@ -40,7 +42,7 @@ export async function POST(req: NextRequest) {
   const parsed = esquemaFijo.safeParse(await leerJson(req))
   if (!parsed.success) return errorValidacion(parsed.error)
   const datos = parsed.data
-  if (datos.ambito === 'hogar') datos.camion_id = null
+  datos.camion_id = await vehiculoDelAmbito(auth.supabase, datos.camion_id, datos.ambito)
   const { data, error } = await auth.supabase.from('tcg_fijos').insert(datos).select('*').single()
   if (error) {
     if (faltaMigracionTCG(error)) return NextResponse.json({ error: 'Falta activar los gastos fijos en Supabase (supabase/migracion_transportes_fijos.sql)' }, { status: 503 })

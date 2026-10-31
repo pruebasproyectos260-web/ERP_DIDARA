@@ -159,7 +159,7 @@ export default function AsistenciaTCG() {
     <div className="space-y-5">
       <EncabezadoPagina
         titulo="Asistencia y aguinaldo"
-        subtitulo="Se toma sola de TALONES y REMI: si alguien hizo un talón, remisión, relación o movimiento de caja, asistió"
+        subtitulo="Se toma sola de TALONES y REMI: si alguien capturó un talón o un informe ese día, asistió"
         acciones={
           <>
             <div className="inline-flex items-center rounded-xl border border-gray-200 bg-white p-1">

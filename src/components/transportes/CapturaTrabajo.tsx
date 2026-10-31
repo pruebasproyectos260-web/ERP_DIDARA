@@ -4,10 +4,11 @@ import { useState } from 'react'
 import { Loader2, Trash2 } from 'lucide-react'
 import { confirmar } from '@/components/ui/Avisos'
 import { formatoMoneda, hoyISO, ivaIncluido } from '@/lib/finanzas'
-import { COLOR_TRABAJO, ETIQUETA_TRABAJO, TIPOS_TRABAJO, type Camion, type TipoTrabajo, type Trabajo } from '@/lib/transportes'
+import { COLOR_TRABAJO, ETIQUETA_TRABAJO, NOMBRE_USO, TIPOS_TRABAJO, type Camion, type TipoTrabajo, type Trabajo, type Uso } from '@/lib/transportes'
 import { claseCampo, FotosComprobante, HojaCaptura, Interruptor, leerNumero, MetodoPago, useComprobantes } from './comunes'
 
 interface Props {
+  uso: Uso
   trabajo?: Trabajo
   camiones: Camion[]
   camionInicial?: number | null
@@ -16,7 +17,9 @@ interface Props {
   onEliminado: () => void
 }
 
-export default function CapturaTrabajo({ trabajo: t, camiones, camionInicial, onCerrar, onGuardado, onEliminado }: Props) {
+export default function CapturaTrabajo({ uso, trabajo: t, camiones, camionInicial, onCerrar, onGuardado, onEliminado }: Props) {
+  const vehiculo = NOMBRE_USO[uso].uno
+  const [cambioAceite, setCambioAceite] = useState(t?.cambio_aceite ?? false)
   const [camionId, setCamionId] = useState(String(t?.camion_id ?? camionInicial ?? (camiones.filter((c) => c.activo).length === 1 ? camiones.find((c) => c.activo)!.id : '')))
   const [fecha, setFecha] = useState(t?.fecha ?? hoyISO())
   const [tipo, setTipo] = useState<TipoTrabajo | ''>(t?.tipo ?? '')
@@ -42,9 +45,10 @@ export default function CapturaTrabajo({ trabajo: t, camiones, camionInicial, on
   async function guardar(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (!camionId) return setError('Elige el camión')
+    if (!camionId) return setError(`Elige el ${vehiculo}`)
     if (!tipo) return setError('Elige el tipo de trabajo')
     if (descripcion.trim().length < 2) return setError('Describe el trabajo')
+    if (cambioAceite && !kmTexto) return setError('Para el cambio de aceite escribe el kilometraje: desde ahí se cuenta el siguiente')
     setGuardando(true)
     try {
       const r = await fetch(t ? `/api/transportes/trabajos/${t.id}` : '/api/transportes/trabajos', {
@@ -57,6 +61,7 @@ export default function CapturaTrabajo({ trabajo: t, camiones, camionInicial, on
           kilometraje: kmTexto ? Math.round(leerNumero(kmTexto)) : null,
           costo,
           notas: notas.trim() || null,
+          cambio_aceite: cambioAceite,
           metodo_pago: metodo || null,
           con_factura: costo > 0 && conFactura,
           iva: costo > 0 && conFactura && ivaMostrado ? leerNumero(ivaMostrado) : null,
@@ -78,7 +83,7 @@ export default function CapturaTrabajo({ trabajo: t, camiones, camionInicial, on
 
   async function eliminar() {
     if (!t) return
-    const mensaje = t.costo > 0 ? `Se borra también su gasto de ${formatoMoneda(t.costo)} en Gastos de la empresa, con sus fotos.` : 'No se puede deshacer.'
+    const mensaje = t.costo > 0 ? `Se borra también su gasto de ${formatoMoneda(t.costo)} en Gastos ${uso === 'familia' ? 'del hogar' : 'de la empresa'}, con sus fotos.` : 'No se puede deshacer.'
     if (!(await confirmar({ titulo: '¿Eliminar este trabajo?', mensaje, peligro: true }))) return
     const r = await fetch(`/api/transportes/trabajos/${t.id}`, { method: 'DELETE' })
     const j = await r.json().catch(() => ({}))
@@ -110,9 +115,9 @@ export default function CapturaTrabajo({ trabajo: t, camiones, camionInicial, on
     >
       <div className="grid gap-3 sm:grid-cols-[1fr,auto]">
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-gray-500">Camión</span>
+          <span className="mb-1 block text-xs font-medium capitalize text-gray-500">{vehiculo}</span>
           <select value={camionId} onChange={(e) => setCamionId(e.target.value)} required className={claseCampo}>
-            <option value="">Elige el camión</option>
+            <option value="">Elige el {vehiculo}</option>
             {camionesVisibles.map((c) => <option key={c.id} value={c.id}>{c.nombre}{c.placas ? ` · ${c.placas}` : ''}</option>)}
           </select>
         </label>
@@ -149,16 +154,20 @@ export default function CapturaTrabajo({ trabajo: t, camiones, camionInicial, on
           <input value={taller} onChange={(e) => setTaller(e.target.value)} maxLength={150} placeholder="Ej. Taller Hernández" className={claseCampo} />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-gray-500">Kilometraje (opcional)</span>
-          <input value={kmTexto} onChange={(e) => setKmTexto(e.target.value.replace(/[^\d,]/g, ''))} inputMode="numeric" placeholder="Ej. 452,300" className={claseCampo} />
+          <span className="mb-1 block text-xs font-medium text-gray-500">Kilometraje {cambioAceite ? '' : '(opcional)'}</span>
+          <input value={kmTexto} onChange={(e) => setKmTexto(e.target.value.replace(/[^\d,]/g, ''))} inputMode="numeric" placeholder="Ej. 452,300" required={cambioAceite} className={claseCampo} />
         </label>
+      </div>
+
+      <div className="rounded-2xl border border-gray-200 p-3">
+        <Interruptor titulo="Fue cambio de aceite" detalle="Desde aquí se cuenta el siguiente cambio (por km y por meses)" valor={cambioAceite} onCambio={setCambioAceite} />
       </div>
 
       <div className="rounded-2xl border border-gray-200 p-3">
         <label className="flex items-center justify-between gap-3">
           <span>
             <span className="block text-sm font-medium text-gray-900">Costo</span>
-            <span className="block text-xs text-gray-500">Si costó algo, se registra solo en Gastos de la empresa</span>
+            <span className="block text-xs text-gray-500">Si costó algo, se registra solo en Gastos {uso === 'familia' ? 'del hogar' : 'de la empresa'}</span>
           </span>
           <span className="flex items-baseline gap-1">
             <span className="text-sm text-gray-500">$</span>

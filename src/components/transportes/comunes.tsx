@@ -78,13 +78,13 @@ export function Interruptor({ titulo, detalle, valor, onCambio, disabled }: {
  * Fotos de tickets de una captura. Las que se suben y no se llegan a guardar se borran al cancelar
  * (llamar a descartar()); al guardar, llamar a confirmar().
  */
-export function useComprobantes(iniciales: string[] = []) {
+export function useComprobantes(iniciales: string[] = [], max = 5) {
   const [comprobantes, setComprobantes] = useState<string[]>(iniciales)
   const [subiendo, setSubiendo] = useState(false)
   const nuevos = useRef<string[]>([])
 
   async function subir(archivo: File) {
-    if (comprobantes.length >= 5) return aviso.error('Máximo 5 fotos')
+    if (comprobantes.length >= max) return aviso.error(`Máximo ${max} archivos`)
     setSubiendo(true)
     try {
       const form = new FormData()
@@ -112,7 +112,7 @@ export function useComprobantes(iniciales: string[] = []) {
   const descartar = () => { for (const ruta of nuevos.current) void fetch(urlComprobanteTCG(ruta), { method: 'DELETE' }) }
   const confirmar = () => { nuevos.current = [] }
 
-  return { comprobantes, subiendo, subir, quitar, descartar, confirmar }
+  return { comprobantes, subiendo, subir, quitar, descartar, confirmar, max }
 }
 
 export function FotosComprobante({ c, soloLectura = false, titulo = 'Foto del ticket o factura' }: {
@@ -142,7 +142,7 @@ export function FotosComprobante({ c, soloLectura = false, titulo = 'Foto del ti
             )}
           </div>
         ))}
-        {!soloLectura && c.comprobantes.length < 5 && (
+        {!soloLectura && c.comprobantes.length < c.max && (
           <button type="button" onClick={() => input.current?.click()} disabled={c.subiendo}
             className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-brand-400 hover:text-brand-700 disabled:opacity-60">
             {c.subiendo ? <Loader2 size={20} className="animate-spin" /> : <Camera size={20} />}

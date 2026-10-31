@@ -5,7 +5,7 @@ import { Check, ChevronDown, Loader2, Pencil, Plus, Repeat, Trash2 } from 'lucid
 import { aviso, confirmar } from '@/components/ui/Avisos'
 import { BurbujaCategoria } from '@/components/finanzas/categorias'
 import { formatoMoneda, hoyISO, mesActual, nombreMes } from '@/lib/finanzas'
-import { CATEGORIAS_TCG, type Ambito, type Camion, type FijoTCG } from '@/lib/transportes'
+import { CATEGORIAS_TCG, PERIODOS, nombrePeriodo, type Ambito, type Camion, type FijoTCG } from '@/lib/transportes'
 import { claseCampo, HojaCaptura, Interruptor, leerNumero, MetodoPago } from './comunes'
 
 const fechaCorta = (f: string) => new Date(`${f}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
@@ -52,6 +52,8 @@ export default function FijosTCG({ ambito, mes, camiones, version, onCambio }: {
   if (!fijos) return null
 
   const vigentes = fijos.filter((f) => f.vigente)
+  // Los que no tocan este mes (bimestrales, semestrales, anuales…) pero siguen activos
+  const otros = fijos.filter((f) => !f.vigente && f.proximo).sort((a, b) => (a.proximo ?? '').localeCompare(b.proximo ?? ''))
   const pagados = vigentes.filter((f) => f.pagado)
   const faltan = vigentes.filter((f) => !f.pagado)
   const porPagar = faltan.reduce((a, f) => a + f.monto, 0)
@@ -66,12 +68,12 @@ export default function FijosTCG({ ambito, mes, camiones, version, onCambio }: {
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-gray-900">Gastos fijos de {nombreMes(mes).toLowerCase()}</span>
             <span className="block text-xs text-gray-500">
-              {vigentes.length === 0 ? 'Renta, luz, internet, sueldos, colegiaturas… lo que se paga cada mes'
+              {vigentes.length === 0 ? (otros.length ? `Este mes no toca ninguno · ${otros.length} más adelante` : 'Renta, luz, seguros, colegiaturas… lo que se paga cada mes o cada varios meses')
                 : faltan.length === 0 ? `Todos pagados (${pagados.length})`
                   : `${pagados.length} de ${vigentes.length} pagados · faltan ${formatoMoneda(porPagar)}`}
             </span>
           </span>
-          {vigentes.length > 0 && <ChevronDown size={18} className={`ml-auto shrink-0 text-gray-400 transition-transform ${abierto ? 'rotate-180' : ''}`} />}
+          {(vigentes.length > 0 || otros.length > 0) && <ChevronDown size={18} className={`ml-auto shrink-0 text-gray-400 transition-transform ${abierto ? 'rotate-180' : ''}`} />}
         </button>
         <button type="button" onClick={() => setEditar({})} title="Agregar gasto fijo" aria-label="Agregar gasto fijo"
           className="shrink-0 rounded-lg border border-gray-200 p-2 text-gray-500 hover:bg-gray-50 hover:text-gray-900">
@@ -90,6 +92,7 @@ export default function FijosTCG({ ambito, mes, camiones, version, onCambio }: {
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
                     <span className="truncate text-sm font-medium text-gray-900">{f.nombre}</span>
+                    {f.cada_meses > 1 && <span className="shrink-0 rounded-full bg-gray-100 px-1.5 py-px text-[10px] font-medium text-gray-600">{nombrePeriodo(f.cada_meses)}</span>}
                     <button type="button" onClick={() => setEditar({ f })} aria-label={`Editar ${f.nombre}`} className="shrink-0 rounded p-0.5 text-gray-300 hover:text-gray-600"><Pencil size={12} /></button>
                   </span>
                   <span className={`block text-xs ${f.pagado ? 'text-emerald-700' : vencido ? 'font-medium text-red-600' : 'text-gray-500'}`}>
@@ -111,6 +114,26 @@ export default function FijosTCG({ ambito, mes, camiones, version, onCambio }: {
             )
           })}
         </ul>
+      )}
+      {abierto && otros.length > 0 && (
+        <div className="border-t border-gray-100 px-4 py-2.5">
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Más adelante</p>
+          <ul className="space-y-1.5">
+            {otros.map((f) => (
+              <li key={f.id} className="flex items-center gap-3 text-sm">
+                <BurbujaCategoria categoria={f.categoria} tamano={28} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-gray-700">{f.nombre}</span>
+                    <button type="button" onClick={() => setEditar({ f })} aria-label={`Editar ${f.nombre}`} className="shrink-0 rounded p-0.5 text-gray-300 hover:text-gray-600"><Pencil size={12} /></button>
+                  </span>
+                  <span className="block text-xs text-gray-400">Toca en {nombreMes(f.proximo!).toLowerCase()} · {nombrePeriodo(f.cada_meses)}</span>
+                </span>
+                <span className="shrink-0 tabular-nums text-gray-500">{formatoMoneda(f.monto)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {pagar && <PagarFijo fijo={pagar} mes={mes} onCerrar={() => setPagar(null)} onPagado={() => { setPagar(null); aviso.exito('Pago registrado'); onCambio() }} />}
@@ -187,6 +210,7 @@ function EditarFijo({ ambito, fijo: f, camiones, mesInicial, onCerrar, onGuardad
   const [diaTexto, setDiaTexto] = useState(f?.dia ? String(f.dia) : '')
   const [desde, setDesde] = useState(f?.desde ?? mesInicial)
   const [hasta, setHasta] = useState(f?.hasta ?? '')
+  const [cadaMeses, setCadaMeses] = useState(f?.cada_meses ?? 1)
   const [metodo, setMetodo] = useState(f?.metodo_pago ?? '')
   const [conFactura, setConFactura] = useState(f?.con_factura ?? false)
   const [camionId, setCamionId] = useState(f?.camion_id ? String(f.camion_id) : '')
@@ -210,8 +234,8 @@ function EditarFijo({ ambito, fijo: f, camiones, mesInicial, onCerrar, onGuardad
         body: JSON.stringify({
           ambito, nombre: nombre.trim(), categoria, monto,
           dia: diaTexto ? Math.min(31, Math.max(1, Math.round(leerNumero(diaTexto)))) : null,
-          desde, hasta: hasta || null, metodo_pago: metodo || null, con_factura: conFactura,
-          camion_id: ambito === 'empresa' && camionId ? Number(camionId) : null, notas: notas.trim() || null,
+          desde, hasta: hasta || null, cada_meses: cadaMeses, metodo_pago: metodo || null, con_factura: conFactura,
+          camion_id: camionId ? Number(camionId) : null, notas: notas.trim() || null,
         }),
       })
       const j = await r.json()
@@ -265,13 +289,19 @@ function EditarFijo({ ambito, fijo: f, camiones, mesInicial, onCerrar, onGuardad
           {opciones.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </label>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-gray-500">¿Cada cuánto se paga?</span>
+        <select value={cadaMeses} onChange={(e) => setCadaMeses(Number(e.target.value))} className={claseCampo}>
+          {PERIODOS.map((p) => <option key={p.meses} value={p.meses}>{p.nombre}</option>)}
+        </select>
+      </label>
       <div className="grid grid-cols-3 gap-3">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-gray-500">Día que vence</span>
           <input value={diaTexto} onChange={(e) => setDiaTexto(e.target.value.replace(/\D/g, '').slice(0, 2))} inputMode="numeric" placeholder="Ej. 15" className={claseCampo} />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-gray-500">Desde</span>
+          <span className="mb-1 block text-xs font-medium text-gray-500">{cadaMeses > 1 ? 'Mes del próximo pago' : 'Desde'}</span>
           <input type="month" value={desde} onChange={(e) => setDesde(e.target.value)} required className={claseCampo} />
         </label>
         <label className="block">
@@ -283,11 +313,11 @@ function EditarFijo({ ambito, fijo: f, camiones, mesInicial, onCerrar, onGuardad
         <span className="mb-1 block text-xs font-medium text-gray-500">¿Con qué se paga normalmente?</span>
         <MetodoPago valor={metodo} onCambio={setMetodo} />
       </div>
-      {ambito === 'empresa' && camiones.length > 0 && (
+      {camiones.length > 0 && (
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-gray-500">Camión (opcional)</span>
+          <span className="mb-1 block text-xs font-medium text-gray-500">{ambito === 'hogar' ? 'Carro (opcional)' : 'Camión (opcional)'}</span>
           <select value={camionId} onChange={(e) => setCamionId(e.target.value)} className={claseCampo}>
-            <option value="">De la empresa en general</option>
+            <option value="">{ambito === 'hogar' ? 'De la casa en general' : 'De la empresa en general'}</option>
             {camiones.filter((c) => c.activo || String(c.id) === camionId).map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
         </label>

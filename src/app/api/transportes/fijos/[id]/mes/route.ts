@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { errorValidacion, leerJson } from '@/lib/campos'
-import { esquemaMes, hoyMexico, ivaIncluido, rangoMes, recurrenteVigente } from '@/lib/finanzas'
-import { esquemaPagarFijo } from '@/lib/transportes'
+import { esquemaMes, hoyMexico, ivaIncluido, rangoMes } from '@/lib/finanzas'
+import { esquemaPagarFijo, fijoAplica } from '@/lib/transportes'
 import { SELECT_GASTO_TCG, soloSuperAdmin } from '@/lib/transportes-servidor'
 
 /** Marca un gasto fijo como pagado en un mes: crea su gasto (uno por mes) */
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: f } = await auth.supabase.from('tcg_fijos').select('*').eq('id', id).single()
   if (!f) return NextResponse.json({ error: 'Gasto fijo no encontrado' }, { status: 404 })
-  if (!recurrenteVigente(f, mes)) return NextResponse.json({ error: 'Este gasto fijo no aplica en ese mes' }, { status: 400 })
+  if (!fijoAplica(f, mes)) return NextResponse.json({ error: 'Este gasto fijo no toca en ese mes' }, { status: 400 })
 
   // Sin fecha: hoy (mes en curso o adelantado); un mes pasado, su último día
   const hoy = hoyMexico()
