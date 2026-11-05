@@ -53,7 +53,7 @@ export const COLOR_CATEGORIA: Record<string, string> = {
   Cotización: '#16a34a', Servicio: '#0d9488', Póliza: '#7c3aed', 'Otro ingreso': '#65a30d',
   // Transportes (lib/transportes.ts)
   Mantenimiento: '#2563eb', Refacciones: '#0891b2', Seguros: '#0f766e', Súper: '#16a34a', Casa: '#a16207',
-  Escuela: '#7c3aed', Salud: '#e11d48', Ropa: '#db2777', Entretenimiento: '#9333ea',
+  Escuela: '#7c3aed', Salud: '#e11d48', Ropa: '#db2777', Entretenimiento: '#9333ea', 'Gastos papá': '#ea580c',
 }
 export const colorCategoria = (c: string) => COLOR_CATEGORIA[c] ?? '#94a3b8'
 

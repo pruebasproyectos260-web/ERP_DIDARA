@@ -18,7 +18,7 @@ export const CATEGORIAS_TCG: Record<Ambito, readonly string[]> = {
     'Seguros', 'Impuestos', 'Papelería', 'Préstamos', 'Otro',
   ],
   hogar: [
-    'Súper', 'Comida', 'Servicios', 'Casa', 'Escuela', 'Salud', 'Transporte', 'Vehículo', 'Ropa', 'Entretenimiento',
+    'Súper', 'Comida', 'Gastos papá', 'Servicios', 'Casa', 'Escuela', 'Salud', 'Transporte', 'Vehículo', 'Ropa', 'Entretenimiento',
     'Seguros', 'Préstamos', 'Otro',
   ],
 }
